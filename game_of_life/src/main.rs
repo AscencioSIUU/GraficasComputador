@@ -3,9 +3,64 @@ mod framebuffer;
 use raylib::prelude::*;
 use framebuffer::Framebuffer;
 
-const WIDTH: usize = 100;
-const HEIGHT: usize = 100;
+const WIDTH: usize = 800;
+const HEIGHT: usize = 600;
 type Grid = [[bool; WIDTH]; HEIGHT];
+
+fn parse_rle(rle: &str, offset_x: usize, offset_y: usize) -> Vec<(usize, usize)> {
+    let mut result = Vec::new();
+    let mut x = 0;
+    let mut y = 0;
+    let mut count = 0;
+
+    for line in rle.lines() {
+        // Ignorar encabezado y comentarios
+        if line.starts_with('#') || line.starts_with("x") || line.trim().is_empty() {
+            continue;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            let ch = chars[i];
+
+            if ch.is_digit(10) {
+                // Acumular número (puede tener más de una cifra)
+                let mut num_str = ch.to_string();
+                while i + 1 < chars.len() && chars[i + 1].is_digit(10) {
+                    i += 1;
+                    num_str.push(chars[i]);
+                }
+                count = num_str.parse::<usize>().unwrap();
+            } else {
+                let run = if count == 0 { 1 } else { count };
+
+                match ch {
+                    'b' => x += run,
+                    'o' => {
+                        for dx in 0..run {
+                            result.push((offset_x + x + dx, offset_y + y));
+                        }
+                        x += run;
+                    }
+                    '$' => {
+                        y += if count == 0 { 1 } else { count };
+                        x = 0;
+                    }
+                    '!' => break,
+                    _ => {}
+                }
+
+                count = 0;
+            }
+
+            i += 1;
+        }
+    }
+    result
+}
+
 
 fn count_alive_neighbors(grid: &Grid, x: usize, y: usize) -> u8 {
     let mut count = 0;
@@ -68,18 +123,18 @@ fn main() {
     let mut current: Grid = [[false; WIDTH]; HEIGHT];
     let mut next: Grid = [[false; WIDTH]; HEIGHT];
 
-    let cruz = vec![
-        (50, 48),
-        (50, 49),
-        (50, 50),
-        (50, 51),
-        (50, 52),
-        (48, 50),
-        (49, 50),
-        (51, 50),
-        (52, 50),
-    ];
-    for (x, y) in cruz {
+    let rle_data = r#"
+        x = 50, y = 50, rule = B3/S23
+        18bo$17b3o$12b3o4b2o$11bo2b3o2bob2o$10bo3bobo2bobo$10bo4bobobobob2o$12bo4bobo3b2o$
+        4o5bobo4bo3bob3o$o3b2obob3ob2o9b2o$o5b2o5bo$bo2b2obo2bo2bob2o$7bobobobobobo5b4o$
+        bo2b2obo2bo2bo2b2obob2o3bo$o5b2o3bobobo3b2o5bo$o3b2obob2o2bo2bo2bob2o2bo$4o5bobobobobobo$
+        10b2obo2bo2bob2o2bo$13bo5b2o5bo$b2o9b2ob3obob2o3bo$2b3obo3bo4bobo5b4o$
+        2b2o3bobo4bo$2b2obobobobo4bo$5bobo2bobo3bo$4b2obo2b3o2bo$6b2o4b3o$7b3o$8bo!
+        "#;
+
+    let pattern = parse_rle(rle_data, 10, 10);
+
+    for (x, y) in pattern {
         current[y][x] = true;
     }
 
