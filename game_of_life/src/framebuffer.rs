@@ -58,12 +58,4 @@ impl Framebuffer {
             );
         }
     }
-    
-    
-
-    pub fn window_scale_factor(&self, window: &RaylibHandle) -> f32 {
-        let scale_x = window.get_screen_width() as f32 / self.width as f32;
-        let scale_y = window.get_screen_height() as f32 / self.height as f32;
-        scale_x.min(scale_y) 
-    }
 }
