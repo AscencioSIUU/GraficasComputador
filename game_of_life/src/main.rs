@@ -20,7 +20,7 @@ fn main() {
     let mut framebuffer = Framebuffer::new(
         WIDTH as i32,
         HEIGHT as i32,
-        Color::new(50, 50, 100, 255),
+        Color::BLACK,
     );
 
     let mut current: Grid = [[false; WIDTH]; HEIGHT];
