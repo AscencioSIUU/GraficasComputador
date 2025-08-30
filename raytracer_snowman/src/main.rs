@@ -25,12 +25,15 @@ fn game_loop() {
         .build();
 
     let mut framebuffer = Framebuffer::new(FREMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT, Color::WHITE);
-    framebuffer.set_background_color(Color::new(10, 15, 40, 255)); // fondo azul oscuro
+    framebuffer.set_background_color(Color::new(10, 15, 40, 255)); // dark blue bg
 
-    // Colores
-    let GOLD  = Color::new(229, 170, 75, 255);  // cara
-    let MANE  = Color::new(180, 100, 30, 255);  // melena
-    let BLACK = Color::BLACK;                   // ojos y nariz
+    // Colors
+    let GOLD  = Color::new(229, 170, 75, 255); // face
+    let GOLD2  = Color::new(231, 171, 121, 255); // body
+    let GOLD3 = Color::new(230, 112, 40, 255); // body
+    let MANE1 = Color::new(180, 100, 30, 255); // mane
+    let MANE2 = Color::new(230, 140, 30, 255); // mane
+    let BLACK = Color::BLACK;                  // eyes/nose
 
     let z_plane: f32 = -6.0;
 
@@ -40,26 +43,40 @@ fn game_loop() {
 
     let mut objects: Vec<Sphere> = Vec::new();
 
-    // Melena
-    let mane_r_outer = 1.9f32;
-    let mane_r_dot   = 0.65f32;
-    let n_mane       = 18usize;
+    // Eyes
+    objects.push(circle(-0.40,  0.25, 0.15, BLACK));
+    objects.push(circle( 0.40,  0.25, 0.15, BLACK));
+    // Nose
+    objects.push(circle( 0.00, -0.25, 0.30, BLACK));
+
+    // Mane (alternating colors)
+    let mane_r_outer = 1.9_f32;
+    let mane_r_dot   = 0.65_f32;
+    let n_mane       = 18_usize;
     for i in 0..n_mane {
         let t = (i as f32) * std::f32::consts::TAU / (n_mane as f32);
         let x = mane_r_outer * t.cos();
         let y = mane_r_outer * t.sin();
-        objects.push(circle(x, y, mane_r_dot, MANE));
+        objects.push(circle(x, y, mane_r_dot, if i % 2 == 0 { MANE1 } else { MANE2 }));
     }
 
-    // Cabeza
+    // Head
     objects.push(circle(0.0, 0.0, 1.25, GOLD));
 
-    // Ojos (negros)
-    objects.push(circle(0.40, 0.25, 0.15, BLACK));
-    objects.push(circle( 0.40, 0.25, 0.15, BLACK));
+    // Body
+    objects.push(circle(0.0, -2.0, 1.8, GOLD2));
 
-    // Nariz (negra, al centro)
-    objects.push(circle(0.0, -0.25, 0.18, BLACK));
+    // Optional: soften body sides
+    objects.push(circle(-1.4, -2.3, 0.7, GOLD3));
+    objects.push(circle( 1.4, -2.3, 0.7, GOLD3));
+
+    // Legs (helper)
+    let mut add_leg = |x: f32| {
+        objects.push(circle(x, -3.2, 0.55, GOLD3)); // upper leg
+        objects.push(circle(x, -3.9, 0.45, GOLD3)); // paw
+    };
+    add_leg(-0.9);
+    add_leg( 0.9);
 
     let mut saved_png = false;
 
@@ -68,7 +85,7 @@ fn game_loop() {
         render(&mut framebuffer, &objects);
 
         if !saved_png {
-            framebuffer.render_to_png("leon_simple.png");
+            framebuffer.render_to_png("leon.png");
             saved_png = true;
         }
 
@@ -76,7 +93,7 @@ fn game_loop() {
             .load_texture_from_image(&raylib_thread, &framebuffer.color_buffer)
             .unwrap();
 
-        let mut draw_handle = handle.begin_drawing(&raylib_thread);
-        draw_handle.draw_texture(&texture, 0, 0, Color::WHITE);
+        let mut d = handle.begin_drawing(&raylib_thread);
+        d.draw_texture(&texture, 0, 0, Color::WHITE);
     }
 }
