@@ -3,12 +3,12 @@ use raylib::prelude::*;
 
 /// A single wall hit
 struct Hit {
-    distance: f32, // perpendicular distance (no fisheye)
+    distance: f32,
     cell_x: i32,
     cell_y: i32,
-    side: i32,     // 0 = hit on X-side, 1 = hit on Y-side
-    impact: char,  // map char we hit
-    tx: u32,       // texture x (0..W-1)
+    side: i32,
+    impact: char,
+    wall_x: f32, // <-- nuevo (0..1 a lo largo del muro)
 }
 
 /// Draw a full frame: ceiling, walls (textured), floor.
@@ -38,51 +38,80 @@ pub fn draw_world(
         // keep distance for sprite occlusion
         zbuffer[x] = hit.distance;
 
-        // Projected wall height (simple)
-        let line_h = (screen_h as f32 / (hit.distance + 0.0001)).min(screen_h as f32) as i32;
-        let mut draw_start = (-line_h / 2) + (screen_h as i32 / 2);
-        if draw_start < 0 { draw_start = 0; }
-        let mut draw_end = (line_h / 2) + (screen_h as i32 / 2);
-        if draw_end >= screen_h as i32 { draw_end = screen_h as i32 - 1; }
+        // --- Proper projection using cell size and projection plane (vertical) ---
+let cell_size = crate::maze::block_size() as f32;      // world cell size in your units
+let proj_plane_y = (half_h) / (fov * 0.5).tan();       // distance to projection plane (vertical)
 
-        // === Ceiling ===
-        // quick-tile: repeat texture by x and screen-y; looks OK for a raycaster
-        let (_, tex_h) = tex.size_of("ceiling");
-        for y in 0..draw_start.max(0) {
-            let ty = ((y as f32 / draw_start.max(1) as f32) * (tex_h - 1) as f32) as u32;
-            let tx = (x as u32) & 127;
-            let mut color = Color::new(120, 120, 120, 255);
-            apply_fog(&mut color, 0.4);
-            d.draw_pixel(x as i32, y as i32, color);
-        }
+// Wall height in pixels on screen
+let line_h_f = (cell_size * proj_plane_y) / hit.distance.max(1e-4);
+let mut line_h = line_h_f as i32;
+
+// Clamp to screen
+if line_h > screen_h as i32 { line_h = screen_h as i32; }
+
+let mut draw_start = (-line_h / 2) + (screen_h as i32 / 2);
+if draw_start < 0 { draw_start = 0; }
+let mut draw_end = (line_h / 2) + (screen_h as i32 / 2);
+if draw_end >= screen_h as i32 { draw_end = screen_h as i32 - 1; }
+
+
+       // === Ceiling (gris liso) ===
+     for y in 0..draw_start.max(0) {
+          let mut color = Color::new(120, 120, 120, 255);
+          apply_fog(&mut color, 0.35);
+          d.draw_pixel(x as i32, y as i32, color);
+     }
 
         // === Wall slice ===
         let wall_key = wall_key_from_char(hit.impact);
-        let (tw, th) = tex.size_of(wall_key);
-        for y in draw_start..=draw_end {
-            let v = (y - draw_start) as f32 / (draw_end - draw_start + 1) as f32; // 0..1
-            let tx = hit.tx.min(tw - 1);
-            let ty = (v * (th - 1) as f32) as u32;
-            let mut color = tex.get_pixel_color(wall_key, tx, ty);
+let (tw, th) = tex.size_of(wall_key);
 
-            // Simple shading: darken if we hit a Y-side, also fog with distance
-            if hit.side == 1 { darken(&mut color, 0.85); }
-            fog_with_distance(&mut color, hit.distance, 0.015);
-            d.draw_pixel(x as i32, y, color);
-        }
+// compute texture X using wall_x and actual texture width
+let tx_u32 = ((hit.wall_x * (tw as f32 - 1.0)).round() as u32).min(tw - 1);
 
-        // === Floor ===
-        // quick-tile by screen coords (fast & looks fine in retro raycasters)
-        let (_, fth) = tex.size_of("floor");
-        for y in (draw_end + 1) as usize..screen_h {
-            let ty = ((((y - draw_end as usize) as f32) / (screen_h - draw_end as usize) as f32) * (fth - 1) as f32) as u32;
-            let tx = (x as u32) & 127;
-            let mut color = tex.get_pixel_color("floor", tx, ty);
-            // increase fog with vertical distance visually
-            let fake_dist = 0.5 + 1.5 * ((y as f32 - half_h) / half_h).abs();
-            fog_with_distance(&mut color, fake_dist, 0.25);
-            d.draw_pixel(x as i32, y as i32, color);
-        }
+for y in draw_start..=draw_end {
+    let v = (y - draw_start) as f32 / (draw_end - draw_start + 1) as f32; // 0..1 vertical
+    let ty = (v * (th as f32 - 1.0)).round() as u32;
+
+    let mut color = tex.get_pixel_color(wall_key, tx_u32, ty);
+    if hit.side == 1 { darken(&mut color, 0.85); }
+    fog_with_distance(&mut color, hit.distance, 0.015);
+    d.draw_pixel(x as i32, y, color);
+}
+
+
+        // === Floor (tileado por celda, no “zoom”) ===
+let (ftw, fth) = tex.size_of("floor");
+let cell = crate::maze::block_size() as f32;
+
+// precompute ray direction (en mundo, unitario)
+let ray_dir_x = ray_angle.cos();
+let ray_dir_y = ray_angle.sin();
+
+
+for y in (draw_end + 1) as usize..screen_h {
+    // distancia “de fila” aproximada (retro look) basada en la geometría de proyección
+    let p = (y as f32 - half_h).max(1.0);
+     let proj_plane = half_w / (fov * 0.5).tan();
+    let row_dist = (proj_plane * cell) / p; // en píxeles de mundo
+
+    // punto del mundo sobre el piso donde cae este pixel
+    let world_x = player.pos.x + ray_dir_x * row_dist;
+    let world_y = player.pos.y + ray_dir_y * row_dist;
+
+    // fracción dentro de la celda 0..cell
+    let fx = (world_x.rem_euclid(cell)) / cell;
+    let fy = (world_y.rem_euclid(cell)) / cell;
+
+    // mapea 0..cell → 0..tamaño textura
+    let tx = (fx * (ftw - 1) as f32) as u32;
+    let ty = (fy * (fth - 1) as f32) as u32;
+
+    let mut color = tex.get_pixel_color("floor", tx, ty);
+    // un poco de niebla por distancia
+    fog_with_distance(&mut color, row_dist / cell, 0.12);
+    d.draw_pixel(x as i32, y as i32, color);
+}
     }
 }
 
@@ -177,13 +206,13 @@ fn cast_ray_dda(maze: &Maze, player: &Player, angle: f32) -> Hit {
     let tx = (wall_x * 127.0) as u32;
 
     Hit {
-        distance: perp_dist.max(0.0001),
-        cell_x: map_x,
-        cell_y: map_y,
-        side,
-        impact,
-        tx,
-    }
+    distance: perp_dist.max(0.0001),
+    cell_x: map_x,
+    cell_y: map_y,
+    side,
+    impact,
+    wall_x, // keep the 0..1 fraction; convert to tex coords in draw
+}
 }
 
 // === Small helpers for shading/fog ===
