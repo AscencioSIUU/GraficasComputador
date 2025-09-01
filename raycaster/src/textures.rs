@@ -14,6 +14,7 @@ impl TextureManager {
         atlas.insert("wall_a", image::open("assets/textures/wall_a.png")?.to_rgba8());
         atlas.insert("wall_b", image::open("assets/textures/wall_b.png")?.to_rgba8());
         atlas.insert("wall_c", image::open("assets/textures/wall_c.png")?.to_rgba8());
+        atlas.insert("wall_d", image::open("assets/textures/wall_d.png")?.to_rgba8());
         atlas.insert("floor",  image::open("assets/textures/floor.png")?.to_rgba8());
         atlas.insert("ceiling", image::open("assets/textures/ceiling.png")?.to_rgba8());
         Ok(Self { atlas })
@@ -43,6 +44,7 @@ pub fn wall_key_from_char(ch: char) -> &'static str {
         'A' => "wall_a",
         'B' => "wall_b",
         'C' => "wall_c",
+        'D' => "wall_d",
         '#' => "wall_a", // fallback if you used '#'
         _   => "wall_a", // default
     }

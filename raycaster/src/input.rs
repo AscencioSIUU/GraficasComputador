@@ -3,13 +3,19 @@ use crate::player::Player;
 use crate::maze::{Maze, is_wall, block_size};
 
 pub fn process(rl: &RaylibHandle, player: &mut Player, maze: &Maze) {
-    const ROT: f32 = std::f32::consts::PI / 180.0 * 2.0;
     const SPEED: f32 = 2.5;
+    const MOUSE_SENS: f32 = 0.003; // sensibilidad de rotación
 
-    if rl.is_key_down(KeyboardKey::KEY_LEFT)  { player.a -= ROT; }
-    if rl.is_key_down(KeyboardKey::KEY_RIGHT) { player.a += ROT; }
+    // --- Rotación con mouse ---
+    let mouse_delta = rl.get_mouse_delta(); // movimiento relativo del mouse desde el último frame
+    player.a += mouse_delta.x * MOUSE_SENS;
 
-    let mut forward: f32 = 0.0; // <-- add the type
+    // También puedes mantener la rotación con teclas si quieres:
+    if rl.is_key_down(KeyboardKey::KEY_LEFT)  { player.a -= 0.03; }
+    if rl.is_key_down(KeyboardKey::KEY_RIGHT) { player.a += 0.03; }
+
+    // --- Movimiento con teclas ---
+    let mut forward: f32 = 0.0;
     if rl.is_key_down(KeyboardKey::KEY_UP)   { forward += 1.0; }
     if rl.is_key_down(KeyboardKey::KEY_DOWN) { forward -= 1.0; }
 
