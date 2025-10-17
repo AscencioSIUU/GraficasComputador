@@ -9,3 +9,4 @@ pub trait Screen {
 pub mod menu;
 pub mod game;
 pub mod win;
+pub mod pause;

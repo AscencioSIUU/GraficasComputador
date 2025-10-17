@@ -21,6 +21,7 @@ pub fn draw_world(
     player: &Player,
     zbuffer: &mut [f32],
     tex: &TextureManager,
+    render_scale: usize,
 ) {
     let screen_w = d.get_screen_width().max(1) as usize;
     let screen_h = d.get_screen_height().max(1) as usize;
@@ -33,17 +34,22 @@ pub fn draw_world(
     let half_h = screen_h as f32 * 0.5;
     let proj_plane = half_w / (fov * 0.5).tan();
 
-    for x in 0..screen_w {
-        // Map column x -> camera space (-1 .. +1)
-        let camera_x = (x as f32 - half_w) / half_w;
+    let step_x = render_scale.max(1);
+    let step_y = render_scale.max(1);
+    let mut sx = 0usize;
+    let mut col_index = 0usize;
+    while sx < screen_w {
+        // Map column sx -> camera space (-1 .. +1)
+        let camera_x = (sx as f32 - half_w) / half_w;
         let ray_angle = player.a + camera_x * (fov * 0.5);
 
         // Shared ray direction (unit) for ceiling/floor
-        let ray_dir_x = ray_angle.cos();
-        let ray_dir_y = ray_angle.sin();
+    let ray_dir_x = ray_angle.cos();
+    let ray_dir_y = ray_angle.sin();
 
         let hit = cast_ray_dda(maze, player, ray_angle);
-        zbuffer[x] = hit.distance;
+    // write into zbuffer indexed by scaled columns
+    if col_index < zbuffer.len() { zbuffer[col_index] = hit.distance; }
 
         // Projected wall slice height in pixels (cells have height 1.0)
         let line_h_f = (1.0 * proj_plane) / hit.distance.max(1e-4);
@@ -61,9 +67,10 @@ pub fn draw_world(
         let cell = crate::maze::block_size() as f32;
 
         // From the top down to start of the wall slice
-        for y in 0..draw_start.max(0) as usize {
+        let mut sy = 0usize;
+        while sy < draw_start.max(0) as usize {
             // distance from screen center in pixels (above horizon)
-            let p = (half_h - y as f32).max(1.0);
+            let p = (half_h - sy as f32).max(1.0);
             // world row distance using the SAME projection plane
             let row_dist_world = (proj_plane * cell) / p;
 
@@ -83,7 +90,13 @@ pub fn draw_world(
             // fog by distance (in cells)
             let dist_in_cells = row_dist_world / cell;
             fog_with_distance(&mut color, dist_in_cells, 0.12);
-            d.draw_pixel(x as i32, y as i32, color);
+            // draw scaled pixel block
+            if render_scale <= 1 {
+                d.draw_pixel(sx as i32, sy as i32, color);
+            } else {
+                d.draw_rectangle(sx as i32, sy as i32, step_x as i32, step_y as i32, color);
+            }
+            sy += step_y;
         }
 
         // === WALL slice (textured) ===
@@ -91,22 +104,29 @@ pub fn draw_world(
         let (tw, th) = tex.size_of(wall_key);
         let tx_u32 = ((hit.wall_x * (tw as f32 - 1.0)) as u32).min(tw - 1);
 
-        for y in draw_start..=draw_end {
-            let v = (y - draw_start) as f32 / (draw_end - draw_start + 1) as f32;
+        let mut sy2 = draw_start as usize;
+        while sy2 <= draw_end as usize {
+            let v = (sy2 - draw_start as usize) as f32 / (draw_end - draw_start + 1) as f32;
             let ty = ((v * (th as f32 - 1.0)) as u32).min(th - 1);
 
             let mut color = tex.get_pixel_color(wall_key, tx_u32, ty);
             if hit.side == 1 { darken(&mut color, 0.85); }
             fog_with_distance(&mut color, hit.distance, 0.015);
-            d.draw_pixel(x as i32, y, color);
+            if render_scale <= 1 {
+                d.draw_pixel(sx as i32, sy2 as i32, color);
+            } else {
+                d.draw_rectangle(sx as i32, sy2 as i32, step_x as i32, step_y as i32, color);
+            }
+            sy2 += step_y;
         }
 
         // === FLOOR (tiled per cell, same FOV & distance) ===
         let (ftw, fth) = tex.size_of("floor");
 
-        for y in (draw_end + 1) as usize..screen_h {
+        let mut sy3 = (draw_end + 1) as usize;
+        while sy3 < screen_h {
             // distance from screen center in pixels (below horizon)
-            let p = (y as f32 - half_h).max(1.0);
+            let p = (sy3 as f32 - half_h).max(1.0);
             // world row distance
             let row_dist_world = (proj_plane * cell) / p;
 
@@ -123,8 +143,15 @@ pub fn draw_world(
             let mut color = tex.get_pixel_color("floor", tx, ty);
             let dist_in_cells = row_dist_world / cell;
             fog_with_distance(&mut color, dist_in_cells, 0.12);
-            d.draw_pixel(x as i32, y as i32, color);
+            if render_scale <= 1 {
+                d.draw_pixel(sx as i32, sy3 as i32, color);
+            } else {
+                d.draw_rectangle(sx as i32, sy3 as i32, step_x as i32, step_y as i32, color);
+            }
+            sy3 += step_y;
         }
+        sx += step_x;
+        col_index += 1;
     }
 }
 
@@ -244,4 +271,117 @@ fn fog_with_distance(c: &mut Color, dist: f32, density: f32) {
     // simple exponential fog
     let fog = (1.0 - (-density * dist).exp()).clamp(0.0, 1.0);
     apply_fog(c, fog);
+}
+
+/// Render coins as billboard sprites in the 3D world
+pub fn draw_coins(
+    d: &mut RaylibDrawHandle,
+    maze: &Maze,
+    player: &Player,
+    zbuffer: &[f32],
+    tex: &TextureManager,
+    render_scale: usize,
+) {
+    let screen_w = d.get_screen_width().max(1) as usize;
+    let screen_h = d.get_screen_height().max(1) as usize;
+    let block_size = crate::maze::block_size() as f32;
+    
+    // Collect all coin positions
+    let mut coins = Vec::new();
+    for (y, row) in maze.iter().enumerate() {
+        for (x, &ch) in row.iter().enumerate() {
+            if ch == 'X' || ch == 'x' {
+                // Center of the tile
+                let world_x = (x as f32 + 0.5) * block_size;
+                let world_y = (y as f32 + 0.5) * block_size;
+                coins.push((world_x, world_y));
+            }
+        }
+    }
+    
+    // Sort coins by distance (farthest first for proper occlusion)
+    coins.sort_by(|a, b| {
+        let da = ((a.0 - player.pos.x).powi(2) + (a.1 - player.pos.y).powi(2)).sqrt();
+        let db = ((b.0 - player.pos.x).powi(2) + (b.1 - player.pos.y).powi(2)).sqrt();
+        db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    
+    let fov = player.fov;
+    let half_w = screen_w as f32 * 0.5;
+    let half_h = screen_h as f32 * 0.5;
+    let proj_plane = half_w / (fov * 0.5).tan();
+    
+    // Get coin texture
+    let coin_key = "coin";
+    let (tex_w, tex_h) = tex.size_of(coin_key);
+    
+    for (coin_x, coin_y) in coins {
+        // Vector from player to coin
+        let dx = coin_x - player.pos.x;
+        let dy = coin_y - player.pos.y;
+        let distance = (dx * dx + dy * dy).sqrt();
+        
+        if distance < 1.0 { continue; } // Too close
+        
+        // Angle to coin relative to player direction
+        let angle_to_coin = dy.atan2(dx);
+        let mut angle_diff = angle_to_coin - player.a;
+        
+        // Normalize angle to -PI..PI
+        while angle_diff > std::f32::consts::PI { angle_diff -= 2.0 * std::f32::consts::PI; }
+        while angle_diff < -std::f32::consts::PI { angle_diff += 2.0 * std::f32::consts::PI; }
+        
+        // Check if coin is within FOV
+        if angle_diff.abs() > fov * 0.5 + 0.2 { continue; }
+        
+        // Project to screen x
+        let screen_x = ((angle_diff / (fov * 0.5)) * half_w + half_w) as i32;
+        
+        // Sprite height based on distance (coins are smaller than full block height)
+        let sprite_height = (0.5 * proj_plane / distance.max(1e-4)) as i32;
+        let sprite_width = sprite_height; // Square sprite
+        
+        let draw_start_y = (half_h as i32 - sprite_height / 2).max(0);
+        let draw_end_y = (half_h as i32 + sprite_height / 2).min(screen_h as i32 - 1);
+        let draw_start_x = (screen_x - sprite_width / 2).max(0);
+        let draw_end_x = (screen_x + sprite_width / 2).min(screen_w as i32 - 1);
+        
+        // Draw sprite column by column with zbuffer check
+        for sx in (draw_start_x..=draw_end_x).step_by(render_scale.max(1)) {
+            let col_index = (sx as usize) / render_scale.max(1);
+            
+            // Check zbuffer for occlusion
+            if col_index < zbuffer.len() && distance > zbuffer[col_index] {
+                continue; // Coin is behind a wall
+            }
+            
+            // Texture x coordinate
+            let tx = ((sx - (screen_x - sprite_width / 2)) as f32 / sprite_width as f32 * tex_w as f32) as usize;
+            let tx = tx.min(tex_w - 1);
+            
+            for sy in (draw_start_y..=draw_end_y).step_by(render_scale.max(1)) {
+                // Texture y coordinate
+                let ty = ((sy - draw_start_y) as f32 / sprite_height as f32 * tex_h as f32) as usize;
+                let ty = ty.min(tex_h - 1);
+                
+                // Sample texture
+                let mut color = tex.sample_at(coin_key, tx, ty);
+                
+                // Skip transparent pixels (assuming black or very dark = transparent)
+                if color.r < 10 && color.g < 10 && color.b < 10 {
+                    continue;
+                }
+                
+                // Apply fog
+                fog_with_distance(&mut color, distance / block_size, 0.15);
+                
+                // Draw pixel or block depending on render_scale
+                if render_scale > 1 {
+                    d.draw_rectangle(sx, sy, render_scale as i32, render_scale as i32, color);
+                } else {
+                    d.draw_pixel(sx, sy, color);
+                }
+            }
+        }
+    }
 }

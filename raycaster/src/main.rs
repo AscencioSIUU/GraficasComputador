@@ -20,6 +20,10 @@ fn main() {
         .title("Rust Ray Caster")
         .build();
     rl.set_target_fps(60);
+    
+    // Desactivar ESC como tecla de salida predeterminada
+    // para que podamos usarla para el menú de pausa
+    rl.set_exit_key(None);
 
     let mut screen: Box<dyn Screen> = Box::new(MenuScreen::default());
 

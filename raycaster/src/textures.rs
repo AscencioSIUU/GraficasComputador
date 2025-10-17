@@ -17,6 +17,7 @@ impl TextureManager {
         atlas.insert("wall_d", image::open("assets/textures/wall_d.png")?.to_rgba8());
         atlas.insert("floor",  image::open("assets/textures/floor.png")?.to_rgba8());
         atlas.insert("ceiling", image::open("assets/textures/ceiling.png")?.to_rgba8());
+        atlas.insert("coin", image::open("assets/textures/coin.png")?.to_rgba8());
         Ok(Self { atlas })
     }
 
@@ -40,7 +41,7 @@ impl TextureManager {
 
 /// Map wall char ('#','A','B','C',...) to texture key inside the atlas.
 pub fn wall_key_from_char(ch: char) -> &'static str {
-    match ch {
+    match ch.to_ascii_uppercase() {
         'A' => "wall_a",
         'B' => "wall_b",
         'C' => "wall_c",

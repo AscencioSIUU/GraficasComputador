@@ -1,7 +1,21 @@
-################
-#   ####       #
-#   #  #   E   #
-# P #  #       #
-#   ####       #
-#              #
-################
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+B P X     X   CCCC X   X     X B
+B   BBBB  X   C  C   BBB   X   B
+B X B  X BBBB C  C X B X BBB X B
+B   B      XB CCCC   B   B   X B
+BBBBB X BB  B X    BBBB  B  BB B
+B X   X B X   X  X B  X  X  B XB
+B   BBB B  DDDDDDDDDD  BBB  B  B
+B X B X B  D X     X D X B  B XB
+B   B   B  D   CCC   D   B  B  B
+BBB B X BD X   C C X  D  B  B XB
+B X   X B  D X C C   BD  B  B  B
+B   BBB B  DDDDDDDDDD   BBB B XB
+B X B   B  X     X   X  X   BBB
+B   B X BBBBB X   BBBBB  BB    B
+BBB   X   X   BBB   X    X   BB B
+B   BBBBBBB   B X BBBBB  BBB X B
+B X X     B X B     X B  X   BB B
+B   BBBBB B   BBBBB   B  BBB  X B
+B X X   X B X X   X XBBB X   BB B
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB

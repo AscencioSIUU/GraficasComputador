@@ -1,7 +1,26 @@
-################
-#AAAA      BBB #
-#A  A      B  B#
-#A  P         E#
-#AAAA      BBB #
-################
-s
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C P X   X   DDDD X     X   AAAA X   C
+C   CCCC  X D  D   CCC   X A  A   X C
+C X C  X CCCC D  D X C X CC  A CC X C
+C   C      XC DDDD   C   C  A  C  X C
+CCCCC X CC  C X    CCCC  C  AAAA CB C
+C X   X C X   X  X C  X  X  BBBB  XC
+C   CCC C  AAAAAAAAAA  CCC  B  B   C
+C X C X C  A X     X A X C  B  B  XC
+C   C   C  A   DDD   A   C  BBBB   C
+CCC C X CA X   D D X  A  C  C   C XC
+C X   X C  A X D D   CA  C  C X C  C
+C   CCC C  AAAAAAAAAA   CCC C   C XC
+C X C   C  X     X   X  X   CCCCC  C
+C   C X CCCCC X   CCCCC  CC  X    C
+CCC   X   X   CCC   X    X   BB   C
+C   CCCCCCC   C X CCCCC  CCC B B X C
+C X X     C X C     X C  X   B B C C
+C   CCCCC C   CCCCC   C  CCC BBBC C
+C X X   X C X X   X XCCC X   AA  X C
+C   CCC   C   CCC   C  X   X A A  C
+C X X   CCCCC X   CCC  CCCCC AAAC C
+CCC   X X   X   X   X  X   X    X C
+C   CCCCCCCCCCCCCCCCCCCCCCCCCCCCC C
+C X X     X     X     X     X    X C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC

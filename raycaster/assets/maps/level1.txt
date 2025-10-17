@@ -1,5 +1,20 @@
-AAAADAABAAACAAAAAAAADADAA
-A  P  A   A             B
-D     A B A    A C A    D
-C              A   A    D
-AADDDDDAAADAADAAAAADADAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A P X     A X   X A X     X     A
+A   AAA   A   A   A   AAA   X   A
+A X A X X     A       A X AAA X A
+A   A   AAAAAAA   X   AAAA    X A
+A X   X A X   A   AAAAA  X   AA A
+AAAAA   A   X   X A    X   X A  A
+A X   X   AAAAAAAAAA  AAAA   A XA
+A   AAA X A X     X A X  A X A  A
+A X A   X A   AAA   A    A   A XA
+A   A X AAAA  A X XAAAX  AAA A  A
+AAA A X A  X  A X  A  X  A X A XA
+A X   X A   AAAAAAAAAA X A   A  A
+A   AAA   X A X     X A  AAA A XA
+A X A   X   A   BBB   A  A X AAA
+A   A   AAAAAAA BBB AAAA A X    A
+AAA   X     X   BBB    X A   AA A
+A   AAAAAAA   AAAAAAA    AAA  X A
+A X X     A X A  X  A X  X   AA A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA

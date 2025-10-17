@@ -7,10 +7,10 @@ pub fn process(rl: &RaylibHandle, player: &mut Player, maze: &Maze) {
     const MOUSE_SENS: f32 = 0.003; // sensibilidad de rotación
 
     // --- Rotación con mouse ---
-    let mouse_delta = rl.get_mouse_delta(); // movimiento relativo del mouse desde el último frame
+    let mouse_delta = rl.get_mouse_delta();
     player.a += mouse_delta.x * MOUSE_SENS;
 
-    // También puedes mantener la rotación con teclas si quieres:
+    // --- Rotación con teclas (como alternativa) ---
     if rl.is_key_down(KeyboardKey::KEY_LEFT)  { player.a -= 0.03; }
     if rl.is_key_down(KeyboardKey::KEY_RIGHT) { player.a += 0.03; }
 
