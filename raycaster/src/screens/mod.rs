@@ -1,12 +1,12 @@
 use raylib::prelude::*;
 
 pub trait Screen {
-    fn update(&mut self, _rl: &RaylibHandle) {}
-    fn draw_raylib(&mut self, _d: &mut RaylibDrawHandle) {}
-    fn next(&mut self) -> Option<Box<dyn Screen>> { None }
+    fn update(&mut self, rl: &RaylibHandle);
+    fn next(&mut self) -> Option<Box<dyn Screen>>;
+    fn draw_raylib(&mut self, d: &mut RaylibDrawHandle);
 }
 
 pub mod menu;
 pub mod game;
 pub mod win;
-pub mod pause;
+pub mod gameover;

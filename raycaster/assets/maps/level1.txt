@@ -1,20 +1,20 @@
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-A P X     A X   X A X     X     A
-A   AAA   A   A   A   AAA   X   A
-A X A X X     A       A X AAA X A
-A   A   AAAAAAA   X   AAAA    X A
-A X   X A X   A   AAAAA  X   AA A
-AAAAA   A   X   X A    X   X A  A
-A X   X   AAAAAAAAAA  AAAA   A XA
-A   AAA X A X     X A X  A X A  A
-A X A   X A   AAA   A    A   A XA
-A   A X AAAA  A X XAAAX  AAA A  A
-AAA A X A  X  A X  A  X  A X A XA
-A X   X A   AAAAAAAAAA X A   A  A
-A   AAA   X A X     X A  AAA A XA
-A X A   X   A   BBB   A  A X AAA
-A   A   AAAAAAA BBB AAAA A X    A
-AAA   X     X   BBB    X A   AA A
-A   AAAAAAA   AAAAAAA    AAA  X A
-A X X     A X A  X  A X  X   AA A
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAEAAFAAAAAAAAAAAAAEAAAAAAAAA
+A P X     D X   X A X     X     E
+F   DDA   A   D   D   AAA   X   E
+A X D X X     A       D X AAA X A
+A   A   DDEDDDA   X   AAAD    X A
+A X   X D X   A   DDDDA  X   AA A
+AAAAD   D   X   X A    X   X D  A
+A X   X   DDDAAADDDA  AAAD   A XA
+A   AAA X D X     X D X  A X D  A
+A X A   X D   AAA   A    D   A XA
+A   D X AAAD  A X XAAAX  DAA A  A
+AAD A X D  X  D X  A  X  D X A XA
+A X   X A   DDDAAADDDA X D   A  A
+A   ADA   X D X     X A  ADA A XA
+A X D   X   A   EBB   D  A X DAA
+A   A   DDDDDDA BFB DDDA D X    A
+AAA   X     X   BCB    X A   DA A
+A   DEEDDDD   DDDAAAA    AAA  X A
+A X X     D X A  X  D X  X   AA A
+AAAEAEAAAAAAAAAAAAAAAAAAAAAAAAAAA
