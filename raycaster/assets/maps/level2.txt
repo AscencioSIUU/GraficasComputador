@@ -1,21 +1,21 @@
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-A P X     X   DDDD X   X     X A
-A   DDDA  X   D  D   AAA   X   A
-A X D  X AAAD C  D X A X DAA X A
-A   A      XD CCCC   D   A   X A
-AAAAD X AA  A X    DAAA  D  AA A
-A X   X D X   X  X A  X  X  D XA
-A   AAA D  DDDDDDDDDD  DAA  A  A
-A X D X A  D X     X D X A  D XA
-A   A   D  D   EFE   D   A  D  A
-AAD A X AD X   C C X  D  D  A XA
-A X   X D  D X B C   AD  A  D  A
-A   ADA A  DDDDDDDDDD   AAA D XA
-A X D   A  X     X   X  X   DAA
-A   D X AAAAD X   DDDDD  AA    A
-AAA   X   X   DDD   X    X   DA A
-A   DDDDDDD   D X AAAAA  AAA X A
-A X X     D X A     X D  X   DA A
-A   DDDDD A   AAAAD   D  AAA  X A
-A X X   X D X X   X XDAA X   AA A
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAA
+A P X   X D   X   X   X A
+A   DDA X   D   AAA   X A
+A X D X AAD C D   X A A A
+A   A   X CC  A D   X   A
+AAA D X A X  DAA  D  AA A
+A X   X D X X A X X  D  A
+A   AAA D  DDD D  AA A  A
+A X D X A D X  D X A D  A
+A   A   D D  EFE   A D  A
+A D A X A X  CBC   D A  A
+A X   X D  D X C D A D  A
+A   ADA A  DDDD  AA  D  A
+A X D   A X   X X  X D  A
+A   D X AAA D  DDD  AA  A
+AAA   X   X   X   X  DA A
+A   DDDD  D X AAA  AA X A
+A X X   D X A   X D X A A
+A   DDD A   AA D   AA X A
+A X X   D X X  XX A   A A
+AAAAAAAAAAAAAAAAAAAAAAAAAAA

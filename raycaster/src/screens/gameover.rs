@@ -102,4 +102,8 @@ impl Screen for GameOverScreen {
         let skull_y = h / 2 + 150;
         d.draw_text("☠", w / 2 - 30, skull_y, 60, Color::new(150, 0, 0, 255));
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

@@ -10,6 +10,7 @@ pub struct Enemy {
     pub alive: bool,
     pub shoot_cooldown: i32,
     pub muzzle_flash: i32, // frames remaining for muzzle flash effect
+    pub shot_effect_timer: i32, // efecto de disparo visual (como el jugador)
 }
 
 impl Enemy {
@@ -21,6 +22,7 @@ impl Enemy {
             alive: true,
             shoot_cooldown: 0,
             muzzle_flash: 0,
+            shot_effect_timer: 0,
         }
     }
     
@@ -131,6 +133,7 @@ impl Enemy {
             
             self.shoot_cooldown = 60; // 1 second cooldown at 60fps
             self.muzzle_flash = 5; // Show flash for 5 frames
+            self.shot_effect_timer = 6; // Efecto visual de disparo
             return true;
         }
         
@@ -186,6 +189,9 @@ impl EnemySystem {
             }
             if enemy.muzzle_flash > 0 {
                 enemy.muzzle_flash -= 1;
+            }
+            if enemy.shot_effect_timer > 0 {
+                enemy.shot_effect_timer -= 1;
             }
             
             let dx = player.pos.x - enemy.pos.x;

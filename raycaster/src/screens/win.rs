@@ -73,4 +73,8 @@ impl Screen for WinScreen {
         // Trophy decoration
         d.draw_text("🏆", w / 2 - 30, h / 2 + 150, 60, Color::GOLD);
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

@@ -17,6 +17,7 @@ pub struct GameScreen {
     level_path: String,
     tex: TextureManager,
     zbuffer: Vec<f32>,
+    fog_of_war: crate::maze::FogOfWar, // Nuevo campo
     music: Option<raylib::prelude::Music<'static>>,
     muted: bool,
     music_volume: f32,
@@ -35,6 +36,12 @@ impl GameScreen {
         let player = Player::new(Vector2::new(96.0, 96.0));
         let tex = TextureManager::from_assets().expect("load textures");
         
+        // Crear fog of war
+        let fog_of_war = crate::maze::FogOfWar::new(
+            maze[0].len(),
+            maze.len()
+        );
+        
         // Spawn enemies - 20 or more per level
         let mut enemies = EnemySystem::new();
         let enemy_count = if level_path.contains("level1") {
@@ -46,10 +53,9 @@ impl GameScreen {
         };
         enemies.spawn_from_maze(&maze, enemy_count);
         
-        let zbuffer = vec![f32::INFINITY; 2048]; // will be resized first frame
-        // Start with higher-quality scale=4 as requested (balance quality + perf)
-        let render_scale = 4usize;
-        // Give an initial cooldown so the auto-adjust doesn't immediately change the scale
+        let zbuffer = vec![f32::INFINITY; 2048];
+        // Empezar con render_scale 3 para balance entre calidad y FPS
+        let render_scale = 3usize; // Balance: no muy pixeleado pero buen FPS
         let scale_cooldown = 120i32; // ~2 seconds at 60fps
         // load music stream from global audio device (if possible)
         let mut music = audio::load_music("assets/audios/dungeon_delver.mp3");
@@ -65,9 +71,45 @@ impl GameScreen {
 
         if let Some(mut m) = music {
             audio::play_music(&m);
-            Self { maze, player, enemies, level_path, tex, zbuffer, music: Some(m), muted: false, music_volume: default_volume, render_scale, scale_cooldown, paused, quit_to_menu, coins_collected, advance_to, game_over }
+            Self { 
+                maze, 
+                player, 
+                enemies, 
+                level_path, 
+                tex, 
+                zbuffer, 
+                fog_of_war, // Agregar aquí
+                music: Some(m), 
+                muted: false, 
+                music_volume: default_volume, 
+                render_scale, 
+                scale_cooldown, 
+                paused, 
+                quit_to_menu, 
+                coins_collected, 
+                advance_to, 
+                game_over 
+            }
         } else {
-            Self { maze, player, enemies, level_path, tex, zbuffer, music: None, muted: false, music_volume: default_volume, render_scale, scale_cooldown, paused, quit_to_menu, coins_collected, advance_to, game_over }
+            Self { 
+                maze, 
+                player, 
+                enemies, 
+                level_path, 
+                tex, 
+                zbuffer, 
+                fog_of_war, // Agregar aquí también
+                music: None, 
+                muted: false, 
+                music_volume: default_volume, 
+                render_scale, 
+                scale_cooldown, 
+                paused, 
+                quit_to_menu, 
+                coins_collected, 
+                advance_to, 
+                game_over 
+            }
         }
     }
 }
@@ -88,6 +130,12 @@ impl Screen for GameScreen {
         if !self.paused && self.player.is_alive() {
             input::process(rl, &mut self.player, &self.maze);
             
+            // Actualizar fog of war
+            self.fog_of_war.update(self.player.pos, &self.maze, 400.0); // Radio de visión 400 pixeles
+            
+            // Update shot effect timer
+            self.player.update_shot_effect();
+            
             // Update enemies (now they can shoot at player)
             self.enemies.update(&mut self.player, &self.maze);
             
@@ -95,6 +143,7 @@ impl Screen for GameScreen {
             if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
                 if let Some(enemy) = self.enemies.get_enemy_at_crosshair(&self.player, 500.0) {
                     enemy.take_damage(34); // Kill in 3 shots
+                    self.player.trigger_shot_effect(); // Activar efecto visual
                 }
             }
             
@@ -183,58 +232,62 @@ impl Screen for GameScreen {
     }
 
     fn draw_raylib(&mut self, d: &mut RaylibDrawHandle) {
-    // make sure zbuffer matches current screen width divided by render_scale
-    let w = d.get_screen_width().max(1) as usize;
-    let scaled_w = (w + self.render_scale - 1) / self.render_scale; // ceil division
-    if self.zbuffer.len() != scaled_w { self.zbuffer.resize(scaled_w, f32::INFINITY); }
+        // make sure zbuffer matches current screen width divided by render_scale
+        let w = d.get_screen_width().max(1) as usize;
+        let scaled_w = (w + self.render_scale - 1) / self.render_scale; // ceil division
+        if self.zbuffer.len() != scaled_w { self.zbuffer.resize(scaled_w, f32::INFINITY); }
 
-    // 3D world (pass render_scale to let renderer draw blocks instead of single pixels)
-    raycaster::draw_world(d, &self.maze, &self.player, &mut self.zbuffer, &self.tex, self.render_scale);
-    
-    // Draw coins as sprites
-    raycaster::draw_coins(d, &self.maze, &self.player, &self.zbuffer, &self.tex, self.render_scale);
-    
-    // Draw enemies as sprites
-    raycaster::draw_enemies(d, &self.enemies.list, &self.player, &self.zbuffer, &self.tex, self.render_scale);
-
-    // HUD (FPS/HP/minimap)
-    let fps_i = d.get_fps();
-    let fps = fps_i as f32;
-    // Draw HUD on the top-right to avoid overlapping the minimap
-    let sw = d.get_screen_width();
-    let hud_x = sw - 300;
-    d.draw_text(&format!("FPS: {}", fps_i), hud_x, 10, 20, Color::LIGHTGRAY);
-    // music status
-    let music_status = if self.muted { "Muted".to_string() } else { format!("On {}%", (self.music_volume * 100.0) as i32) };
-    d.draw_text(&format!("Music: {} (M to toggle)", music_status), hud_x, 30, 20, Color::LIGHTGRAY);
-    d.draw_text(&format!("Render scale: {} (Z/X to change)", self.render_scale), hud_x, 50, 20, Color::LIGHTGRAY);
-    // Coin counter
-    d.draw_text(&format!("Coins: {}", self.coins_collected), hud_x, 70, 20, Color::GOLD);
-    
-    // === MODIFICADO: HUD de juego con pistol view ===
-    ui::draw_game_hud(d, &self.player, &self.tex);
-    
-    // Auto-adjust render scale to try to reach ~60 FPS (cooldown prevents rapid thrash)
-    if self.scale_cooldown <= 0 {
-        if fps < 55.0 && self.render_scale < 6 {
-            self.render_scale += 1;
-            self.scale_cooldown = 120; // wait ~2 seconds before next change
-        } else if fps > 62.0 && self.render_scale > 1 {
-            self.render_scale -= 1;
-            self.scale_cooldown = 120;
+        // 3D world (pass render_scale to let renderer draw blocks instead of single pixels)
+        raycaster::draw_world(d, &self.maze, &self.player, &mut self.zbuffer, &self.tex, self.render_scale);
+        
+        // Draw coins as sprites
+        raycaster::draw_coins(d, &self.maze, &self.player, &self.zbuffer, &self.tex, self.render_scale);
+        
+        // Draw enemies as sprites (solo los visibles)
+        raycaster::draw_enemies(d, &self.enemies.list, &self.player, &self.zbuffer, &self.tex, self.render_scale, &self.fog_of_war);
+        
+        // HUD (FPS/HP/minimap)
+        let fps_i = d.get_fps();
+        let fps = fps_i as f32;
+        // Draw HUD on the top-right to avoid overlapping the minimap
+        let sw = d.get_screen_width();
+        let hud_x = sw - 300;
+        d.draw_text(&format!("FPS: {}", fps_i), hud_x, 10, 20, Color::LIGHTGRAY);
+        // music status
+        let music_status = if self.muted { "Muted".to_string() } else { format!("On {}%", (self.music_volume * 100.0) as i32) };
+        d.draw_text(&format!("Music: {} (M to toggle)", music_status), hud_x, 30, 20, Color::LIGHTGRAY);
+        d.draw_text(&format!("Render scale: {} (Z/X to change)", self.render_scale), hud_x, 50, 20, Color::LIGHTGRAY);
+        // Coin counter
+        d.draw_text(&format!("Coins: {}", self.coins_collected), hud_x, 70, 20, Color::GOLD);
+        
+        // === MODIFICADO: HUD de juego con pistol view ===
+        ui::draw_game_hud(d, &self.player, &self.tex);
+        
+        // Auto-adjust render scale más conservador para mantener calidad
+        if self.scale_cooldown <= 0 {
+            if fps < 58.0 && self.render_scale < 8 {
+                self.render_scale += 1;
+                self.scale_cooldown = 60;
+            } else if fps > 62.0 && self.render_scale > 1 {
+                self.render_scale -= 1;
+                self.scale_cooldown = 120; // Más lento al bajar para mantener calidad
+            }
+        }
+        ui::draw_minimap(d, &self.maze, &self.player, Some(&self.fog_of_war)); // Pasar fog of war al minimap
+        
+        // Draw pause overlay if paused
+        if self.paused {
+            let w = d.get_screen_width();
+            let h = d.get_screen_height();
+            d.draw_rectangle(0, 0, w, h, Color::new(0, 0, 0, 150));
+            d.draw_text("Paused", w/2 - 60, h/2 - 40, 40, Color::WHITE);
+            d.draw_text("Press ESC to resume, Q to quit to menu", w/2 - 180, h/2 + 10, 20, Color::LIGHTGRAY);
         }
     }
-    ui::draw_minimap(d, &self.maze, &self.player);
-    
-    // Draw pause overlay if paused
-    if self.paused {
-        let w = d.get_screen_width();
-        let h = d.get_screen_height();
-        d.draw_rectangle(0, 0, w, h, Color::new(0, 0, 0, 150));
-        d.draw_text("Paused", w/2 - 60, h/2 - 40, 40, Color::WHITE);
-        d.draw_text("Press ESC to resume, Q to quit to menu", w/2 - 180, h/2 + 10, 20, Color::LIGHTGRAY);
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
-}
 }
 
 impl Drop for GameScreen {

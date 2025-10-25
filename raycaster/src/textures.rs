@@ -22,6 +22,8 @@ impl TextureManager {
         atlas.insert("coin", image::open("assets/textures/coin.png")?.to_rgba8());
         atlas.insert("enemy", image::open("assets/textures/enemy.png")?.to_rgba8());
         atlas.insert("pistol_view", image::open("assets/textures/pistol_view.png")?.to_rgba8());
+        atlas.insert("menu", image::open("assets/textures/menu.png")?.to_rgba8());
+        atlas.insert("shot_effect", image::open("assets/textures/shot_effect.png")?.to_rgba8());
         Ok(Self { atlas })
     }
 

@@ -3,12 +3,7 @@ name = "raycaster"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev]
-opt-level = 3
-debug = false
-
-
 [dependencies]
-raylib = "5"
+raylib = "5.0"
 image = "0.25"
 rand = "0.8"

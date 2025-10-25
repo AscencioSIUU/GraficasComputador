@@ -35,6 +35,7 @@ pub fn draw_world(
 
     let step_x = render_scale.max(1);
     let step_y = render_scale.max(1);
+
     let mut sx = 0usize;
     let mut col_index = 0usize;
     
@@ -42,89 +43,61 @@ pub fn draw_world(
         let camera_x = (sx as f32 - half_w) / half_w;
         let ray_angle = player.a + camera_x * (fov * 0.5);
 
-        let ray_dir_x = ray_angle.cos();
-        let ray_dir_y = ray_angle.sin();
-
         let hit = cast_ray_dda(maze, player, ray_angle);
         if col_index < zbuffer.len() { zbuffer[col_index] = hit.distance; }
 
-        let line_h_f = (1.0 * proj_plane) / hit.distance.max(1e-4);
+        let line_h_f = proj_plane / hit.distance.max(1e-4);
         let mut line_h = line_h_f as i32;
-
         if line_h > screen_h as i32 { line_h = screen_h as i32; }
-        let mut draw_start = (-line_h / 2) + (screen_h as i32 / 2);
+        
+        let mut draw_start = (screen_h as i32 - line_h) / 2;
         if draw_start < 0 { draw_start = 0; }
-        let mut draw_end = (line_h / 2) + (screen_h as i32 / 2);
+        let mut draw_end = (screen_h as i32 + line_h) / 2;
         if draw_end >= screen_h as i32 { draw_end = screen_h as i32 - 1; }
 
-        // CEILING
-        let ceiling_key = "ceiling";
-        let (ctw, cth) = tex.size_of(ceiling_key);
-        let cell = crate::maze::block_size() as f32;
-
-        let mut sy = 0usize;
-        while sy < draw_start.max(0) as usize {
-            let p = (half_h - sy as f32).max(1.0);
-            let row_dist_world = (proj_plane * cell) / p;
-            let world_x = player.pos.x - ray_dir_x * row_dist_world;
-            let world_y = player.pos.y - ray_dir_y * row_dist_world;
-            let fx = (world_x.rem_euclid(cell)) / cell;
-            let fy = (world_y.rem_euclid(cell)) / cell;
-            let txu = (fx * (ctw - 1) as f32) as u32;
-            let tyu = (fy * (cth - 1) as f32) as u32;
-            let mut color = tex.get_pixel_color(ceiling_key, txu, tyu);
-            let dist_in_cells = row_dist_world / cell;
-            fog_with_distance(&mut color, dist_in_cells, 0.12);
-            if render_scale <= 1 {
-                d.draw_pixel(sx as i32, sy as i32, color);
-            } else {
-                d.draw_rectangle(sx as i32, sy as i32, step_x as i32, step_y as i32, color);
-            }
-            sy += step_y;
-        }
-
-        // WALL
+        // WALL - Renderizado simple y correcto
         let wall_key = crate::textures::wall_key_from_char_at(hit.impact, hit.cell_x, hit.cell_y);
         let (tw, th) = tex.size_of(wall_key);
         let tx_u32 = ((hit.wall_x * (tw as f32 - 1.0)) as u32).min(tw - 1);
 
-        let mut sy2 = draw_start as usize;
-        while sy2 <= draw_end as usize {
-            let v = (sy2 - draw_start as usize) as f32 / (draw_end - draw_start + 1) as f32;
-            let ty = ((v * (th as f32 - 1.0)) as u32).min(th - 1);
-            let mut color = tex.get_pixel_color(wall_key, tx_u32, ty);
-            if hit.side == 1 { darken(&mut color, 0.85); }
-            fog_with_distance(&mut color, hit.distance, 0.015);
-            if render_scale <= 1 {
-                d.draw_pixel(sx as i32, sy2 as i32, color);
-            } else {
-                d.draw_rectangle(sx as i32, sy2 as i32, step_x as i32, step_y as i32, color);
+        // Renderizado simple: una franja vertical por columna
+        if render_scale > 1 {
+            // Para cada bloque vertical, muestrear el centro de ese bloque
+            let wall_height = draw_end - draw_start + 1;
+            
+            for sy in (draw_start..=draw_end).step_by(step_y) {
+                // Calcular qué parte de la textura corresponde a esta altura
+                let rel_y = sy - draw_start;
+                let v = rel_y as f32 / wall_height as f32;
+                let ty = ((v * (th as f32 - 1.0)) as u32).min(th - 1);
+                
+                let mut color = tex.get_pixel_color(wall_key, tx_u32, ty);
+                if hit.side == 1 { darken(&mut color, 0.85); }
+                fog_with_distance(&mut color, hit.distance, 0.015);
+                
+                // Dibujar bloque
+                let block_height = step_y.min((draw_end - sy + 1) as usize) as i32;
+                d.draw_rectangle(
+                    sx as i32,
+                    sy,
+                    step_x as i32,
+                    block_height,
+                    color
+                );
             }
-            sy2 += step_y;
+        } else {
+            // Render scale 1: pixel perfecto
+            let wall_height = draw_end - draw_start + 1;
+            for sy in draw_start..=draw_end {
+                let v = (sy - draw_start) as f32 / wall_height as f32;
+                let ty = ((v * (th as f32 - 1.0)) as u32).min(th - 1);
+                let mut color = tex.get_pixel_color(wall_key, tx_u32, ty);
+                if hit.side == 1 { darken(&mut color, 0.85); }
+                fog_with_distance(&mut color, hit.distance, 0.015);
+                d.draw_pixel(sx as i32, sy, color);
+            }
         }
 
-        // FLOOR
-        let (ftw, fth) = tex.size_of("floor");
-        let mut sy3 = (draw_end + 1) as usize;
-        while sy3 < screen_h {
-            let p = (sy3 as f32 - half_h).max(1.0);
-            let row_dist_world = (proj_plane * cell) / p;
-            let world_x = player.pos.x + ray_dir_x * row_dist_world;
-            let world_y = player.pos.y + ray_dir_y * row_dist_world;
-            let fx = (world_x.rem_euclid(cell)) / cell;
-            let fy = (world_y.rem_euclid(cell)) / cell;
-            let tx = (fx * (ftw - 1) as f32) as u32;
-            let ty = (fy * (fth - 1) as f32) as u32;
-            let mut color = tex.get_pixel_color("floor", tx, ty);
-            let dist_in_cells = row_dist_world / cell;
-            fog_with_distance(&mut color, dist_in_cells, 0.12);
-            if render_scale <= 1 {
-                d.draw_pixel(sx as i32, sy3 as i32, color);
-            } else {
-                d.draw_rectangle(sx as i32, sy3 as i32, step_x as i32, step_y as i32, color);
-            }
-            sy3 += step_y;
-        }
         sx += step_x;
         col_index += 1;
     }
@@ -204,7 +177,9 @@ fn apply_fog(c: &mut Color, fog: f32) {
 
 pub fn fog_with_distance(c: &mut Color, dist: f32, density: f32) {
     let fog = (1.0 - (-density * dist).exp()).clamp(0.0, 1.0);
-    apply_fog(c, fog);
+    // Fog muy reducido para mejor visibilidad
+    let adjusted_fog = fog * 0.5; // Solo 50% del fog original
+    apply_fog(c, adjusted_fog);
 }
 
 /// Render coins as billboard sprites in the 3D world (cambios mínimos)
@@ -336,6 +311,7 @@ pub fn draw_enemies(
     zbuffer: &[f32],
     tex: &TextureManager,
     render_scale: usize,
+    fog_of_war: &crate::maze::FogOfWar,
 ) {
     let screen_w = d.get_screen_width().max(1) as usize;
     let screen_h = d.get_screen_height().max(1) as usize;
@@ -343,7 +319,14 @@ pub fn draw_enemies(
     
     // Sort enemies by distance (farthest first)
     let mut sorted_enemies: Vec<_> = enemies.iter()
-        .filter(|e| e.alive)
+        .filter(|e| {
+            if !e.alive { return false; }
+            
+            // Verificar si el enemigo está en zona explorada
+            let tile_x = (e.pos.x / block_size) as usize;
+            let tile_y = (e.pos.y / block_size) as usize;
+            fog_of_war.get_exploration(tile_x, tile_y) > 0.3 // Solo mostrar si está explorado
+        })
         .map(|e| {
             let dx = e.pos.x - player.pos.x;
             let dy = e.pos.y - player.pos.y;
@@ -368,7 +351,7 @@ pub fn draw_enemies(
     
     for (enemy, _) in sorted_enemies {
         let dx = enemy.pos.x - player.pos.x;
-        let dy = enemy.pos.y - player.pos.y;
+        let dy = enemy.pos.y - player.pos.y; // CORREGIDO: era pos_y
         
         let angle_to_enemy = dy.atan2(dx);
         let mut angle_diff = angle_to_enemy - player.a;
@@ -435,6 +418,12 @@ pub fn draw_enemies(
             }
         }
         
+        // Draw shot effect overlay if enemy is shooting
+        if enemy.shot_effect_timer > 0 {
+            let intensity = (enemy.shot_effect_timer as f32 / 6.0) * 0.3; // Más sutil para enemigos
+            draw_enemy_shot_effect(d, tex, screen_x, draw_start_y, sprite_width, sprite_height, intensity);
+        }
+        
         // Draw health bar above enemy
         let health_bar_y = draw_start_y - 15;
         if health_bar_y > 0 {
@@ -463,4 +452,21 @@ pub fn draw_enemies(
             d.draw_rectangle_lines(health_bar_x - 1, health_bar_y - 1, health_bar_width + 2, health_bar_height + 2, Color::BLACK);
         }
     }
+}
+
+/// Draw shot effect overlay for an enemy shooting (MÁS OPTIMIZADO)
+fn draw_enemy_shot_effect(
+    d: &mut RaylibDrawHandle,
+    tex: &TextureManager,
+    center_x: i32,
+    center_y: i32,
+    width: i32,
+    height: i32,
+    intensity: f32,
+) {
+    // OPTIMIZACIÓN: Efecto más simple - solo un círculo con color
+    let radius = (width.min(height) as f32 * 0.3) as f32;
+    let alpha = (intensity * 150.0) as u8;
+    let color = Color::new(255, 200, 100, alpha);
+    d.draw_circle(center_x, center_y, radius, color);
 }
