@@ -1,6 +1,7 @@
 # Planet Shaders - Laboratorio de Planetas Procedurales
 
-[Video Demo](https://img.youtube.com/vi/E7)
+[Video Demo](https://youtu.be/E7TbkQ_GLF8)
+
 
 Este proyecto implementa un renderizador 3D que genera planetas procedurales utilizando únicamente **shaders**, sin texturas ni materiales precargados. Todos los efectos visuales se crean mediante cálculos matemáticos y técnicas de ruido procedural en el fragment shader.
 
