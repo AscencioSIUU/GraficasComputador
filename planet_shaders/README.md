@@ -1,6 +1,6 @@
 # Planet Shaders - Laboratorio de Planetas Procedurales
 
-[![Video Demo](https://img.youtube.com/vi/E7
+![Video Demo](https://img.youtube.com/vi/E7)
 
 Este proyecto implementa un renderizador 3D que genera planetas procedurales utilizando únicamente **shaders**, sin texturas ni materiales precargados. Todos los efectos visuales se crean mediante cálculos matemáticos y técnicas de ruido procedural en el fragment shader.
 
@@ -136,17 +136,11 @@ pub struct Uniforms {
 
 ## Capturas de Pantalla
 
-### Planeta Rocoso
-![Planeta Rocoso](screenshots/rocky_planet.png)
-*Superficie con cráteres y variaciones de elevación*
+![img1](png1.png)
 
-### Gigante Gaseoso
-![Gigante Gaseoso](screenshots/gas_giant.png)
-*Bandas atmosféricas y gran tormenta roja*
+![img2](png2.png)
 
-### Planeta de Lava
-![Planeta de Lava](screenshots/lava_planet.png)
-*Superficie fundida con emisión de luz*
+![img3](png3.png)
 
 ## Criterios de Evaluación Cumplidos
 
