@@ -168,8 +168,8 @@ pub struct Uniforms {
 
 ## Autor
 
-[Tu Nombre]  
-[Tu Universidad]  
+Ernesto Ascencio
+Universidad del Valle de Guatemala
 Fecha: Octubre 2025
 
 ## Licencia
