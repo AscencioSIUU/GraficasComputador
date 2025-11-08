@@ -133,11 +133,13 @@ raytracing/
 ```
 
 ## 🎥 Video Demostrativo
-_[Insertar enlace al video aquí]_
+[![Gameplay Video](https://img.youtube.com/vi/ZDTMpiK55qY/maxresdefault.jpg)](https://youtu.be/ZDTMpiK55qY)
+
+👉 **[Ver video completo en YouTube](https://youtu.be/ZDTMpiK55qY)**
 
 ## 👤 Autor
-- **Nombre**: [Tu Nombre]
+- **Nombre**: Ernesto Ascencio
 - **Carrera**: Ingeniería en Ciencias de la Computación
 - **Curso**: Gráficas por Computador
-- **Universidad**: [Tu Universidad]
+- **Universidad**: Universidad del Valle de Guatemala
 - **Año**: 2025
