@@ -1,316 +1,217 @@
-mod framebuffer;
-mod raytracer;
+//! Diorama interactivo inspirado en Minecraft renderizado íntegramente en CPU.
+
+mod camera;
+mod math;
 mod materials;
+mod solid_block;
+mod textured_block;
+mod grass_block;
+mod lighting;
+mod raytracer;
+mod textured_plane;
+mod texture_loader;
+mod framebuffer;
+mod ray;
 
+use camera::OrbitCamera;
+use math::Vec3;
 use raylib::prelude::*;
-use framebuffer::Framebuffer;
-use raytracer::*;
-use materials::{MaterialType};
+use std::f32::consts::PI;
+use texture_loader::TextureStorage;
+use raytracer::{Assets, SceneData, WorldKind, render};
+use lighting::Skybox;
 
-fn main() {
-    let screen_width = 800;
-    let screen_height = 600;
-    
-    let (mut rl, thread) = raylib::init()
-        .size(screen_width, screen_height)
-        .title("Raytracing Diorama - Minecraft Style")
-        .build();
-    
-    rl.set_target_fps(60);
-    
-    let mut fb = Framebuffer::new(screen_width, screen_height, Color::BLACK);
-    let mut camera = Camera::new();
-    let mut time: f32 = 0.0;
-    let mut time_speed: f32 = 1.0;
-    let mut paused = false;
-    
-    println!("=== Cargando escena ===");
-    let mut scene = create_diorama(0.0);
-    println!("=== Escena cargada con {} triángulos y {} esferas ===", 
-             scene.triangles.len(), scene.spheres.len());
-    
-    println!("\n=== CONTROLES ===");
-    println!("W/S: Acercar/Alejar cámara");
-    println!("A/D: Rotar cámara horizontalmente");
-    println!("Q/E: Rotar cámara verticalmente");
-    println!("Espacio: Pausar/Reanudar ciclo día/noche");
-    println!("T: Acelerar tiempo");
-    println!("R: Reset cámara");
-    println!("ESC: Salir\n");
-    
-    let mut frame_count = 0;
-    let mut fps_timer = 0.0;
-    
-    while !rl.window_should_close() {
-        let dt = rl.get_frame_time();
-        fps_timer += dt;
-        frame_count += 1;
-        
-        // Mostrar FPS cada segundo
-        if fps_timer >= 1.0 {
-            println!("FPS: {} | Time: {:.1} | Cam distance: {:.1}", 
-                     frame_count, time, camera.distance);
-            fps_timer = 0.0;
-            frame_count = 0;
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum WorldType {
+    Overworld,
+    Nether,
+}
+
+impl WorldType {
+    fn toggle(self) -> Self {
+        match self {
+            WorldType::Overworld => WorldType::Nether,
+            WorldType::Nether => WorldType::Overworld,
         }
-        
-        // Update time
-        if !paused {
-            time += dt * time_speed;
-        }
-        
-        // Camera controls
-        if rl.is_key_down(KeyboardKey::KEY_W) {
-            camera.distance = (camera.distance - 10.0 * dt).max(5.0);
-        }
-        if rl.is_key_down(KeyboardKey::KEY_S) {
-            camera.distance = (camera.distance + 10.0 * dt).min(50.0);
-        }
-        if rl.is_key_down(KeyboardKey::KEY_A) {
-            camera.yaw -= 2.0 * dt;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_D) {
-            camera.yaw += 2.0 * dt;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_Q) {
-            camera.pitch = (camera.pitch + 1.5 * dt).min(1.5);
-        }
-        if rl.is_key_down(KeyboardKey::KEY_E) {
-            camera.pitch = (camera.pitch - 1.5 * dt).max(-1.5);
-        }
-        if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
-            paused = !paused;
-            println!("Ciclo día/noche: {}", if paused { "PAUSADO" } else { "ACTIVO" });
-        }
-        if rl.is_key_pressed(KeyboardKey::KEY_T) {
-            time_speed *= 2.0;
-            if time_speed > 8.0 { time_speed = 0.25; }
-            println!("Velocidad de tiempo: {}x", time_speed);
-        }
-        if rl.is_key_pressed(KeyboardKey::KEY_R) {
-            camera = Camera::new();
-            time = 0.0;
-            paused = false;
-            println!("Cámara reseteada");
-        }
-        
-        // Update scene with animated textures
-        scene = create_diorama(time);
-        scene.update_time(time);
-        
-        // Render
-        fb.clear();
-        render_parallel(&mut fb, &scene, &camera);
-        
-        // Draw to screen
-        let texture = rl.load_texture_from_image(&thread, &fb.color_buffer)
-            .expect("Failed to create texture");
-        
-        let mut d = rl.begin_drawing(&thread);
-        d.clear_background(Color::BLACK);
-        d.draw_texture(&texture, 0, 0, Color::WHITE);
-        
-        // UI info
-        d.draw_text(&format!("FPS: {}", d.get_fps()), 10, 10, 20, Color::YELLOW);
-        d.draw_text(&format!("Time: {:.1}s", time), 10, 35, 20, Color::YELLOW);
-        d.draw_text(
-            if paused { "PAUSED" } else { "RUNNING" },
-            10, 60, 20,
-            if paused { Color::RED } else { Color::GREEN }
-        );
     }
 }
 
-fn create_diorama(time: f32) -> Scene {
-    let mut scene = Scene::new();
+fn main() {
+    // Configurar threads
+    let num_threads = num_cpus::get();
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build_global()
+        .unwrap();
     
-    // === Texturas animadas ===
-    let water_tex = ImageTexture::animated_water(time);
-    let portal_tex = ImageTexture::animated_portal(time);
+    println!("=== RAYTRACER CPU - MINECRAFT DIORAMA ===");
+    println!("Threads: {}", num_threads);
     
-    // === Materiales ===
-    let grass = Material::with_texture(
-        MaterialType::Grass,
-        ImageTexture::from_file_or_fallback("assets/grass_top.png", Color::new(100, 180, 70, 255))
-    );
-    let grass_side = Material::with_texture(
-        MaterialType::Grass,
-        ImageTexture::from_file_or_fallback("assets/grass_side.png", Color::new(100, 140, 70, 255))
-    );
-    let dirt = Material::with_texture(
-        MaterialType::Dirt,
-        ImageTexture::from_file_or_fallback("assets/dirt.png", Color::new(134, 96, 67, 255))
-    );
-    let stone = Material::with_texture(
-        MaterialType::Stone,
-        ImageTexture::from_file_or_fallback("assets/stone.png", Color::new(128, 128, 128, 255))
-    );
-    let water = Material::with_texture(MaterialType::Water, water_tex);
-    let glass = Material::with_texture(
-        MaterialType::Glass,
-        ImageTexture::from_file_or_fallback("assets/glass.png", Color::new(200, 230, 255, 100))
-    );
-    let torch = Material::new(MaterialType::Torch);
-    let portal_mat = Material::with_texture(MaterialType::Portal, portal_tex);
-    let sand = Material::with_texture(
-        MaterialType::Sand,
-        ImageTexture::from_file_or_fallback("assets/sand.png", Color::new(237, 201, 175, 255))
+    // Configuración de ventana FULLSCREEN
+    let (mut rl, thread) = raylib::init()
+        .title("Raytracer CPU - Minecraft Diorama")
+        .build();
+    
+    // Forzar pantalla completa total
+    rl.toggle_fullscreen();
+    rl.toggle_borderless_windowed();
+    rl.set_target_fps(60);
+    
+    let screen_width = rl.get_screen_width() as u32;
+    let screen_height = rl.get_screen_height() as u32;
+    
+    // OPTIMIZACIÓN CRÍTICA: Reducir resolución para raytracing en CPU
+    let render_scale = 0.2; // 20% = mucho más rápido (antes era 50% = MUY LENTO)
+    
+    let fb_width = ((screen_width as f32 * render_scale) as u32).max(320);
+    let fb_height = ((screen_height as f32 * render_scale) as u32).max(180);
+    
+    println!("Pantalla completa: {}x{}", screen_width, screen_height);
+    println!("Framebuffer raytracing: {}x{} ({}%)", 
+        fb_width, fb_height, (render_scale * 100.0) as u32);
+    
+    let img = Image::gen_image_color(fb_width as i32, fb_height as i32, Color::BLACK);
+    let mut tex = rl.load_texture_from_image(&thread, &img).expect("texture");
+    let mut frame = vec![0u8; (fb_width * fb_height * 4) as usize];
+    
+    // Cargar texturas PNG para raytracing optimizado
+    let textures = TextureStorage::load();
+    
+    // Crear skybox usando clouds.png para todas las caras
+    let clouds_tex = textures.get_clouds();
+    let skybox_overworld = Skybox {
+        px: clouds_tex,  // +X (derecha)
+        nx: clouds_tex,  // -X (izquierda)
+        py: clouds_tex,  // +Y (arriba)
+        ny: clouds_tex,  // -Y (abajo)
+        pz: clouds_tex,  // +Z (frente)
+        nz: clouds_tex,  // -Z (atrás)
+        tint: Vec3::new(0.8, 0.9, 1.0), // Tinte azul cielo
+    };
+    
+    // Construir assets para raytracing con texturas y skybox
+    let assets = Assets {
+        grass_cover: Some(textures.get_grass_cover()),
+        grass_side: Some(textures.get_grass_side()),
+        dirt: Some(textures.get_dirt()),
+        stone: Some(textures.get_stone()),
+        wood: Some(textures.get_wood()),
+        leaves: Some(textures.get_leaves()),
+        water: Some(textures.get_water()),
+        lava: Some(textures.get_lava()),
+        obsidian: Some(textures.get_obsidian()),
+        glowstone: Some(textures.get_glowstone()),
+        diamond: Some(textures.get_diamond()),
+        iron: Some(textures.get_iron()),
+        chest: Some(textures.get_chest()),
+        ice: Some(textures.get_ice()),
+        portal: Some(textures.get_portal()),
+        torch: Some(textures.get_torch()),
+        skybox_overworld: Some(skybox_overworld),
+        skybox_nether: None,  // Nether sin skybox (cielo procedural rojo)
+    };
+    
+    // Construir escenas de raytracing con texturas
+    let overworld_rt = raytracer::build_scene(&assets, WorldKind::Overworld);
+    let nether_rt = raytracer::build_scene(&assets, WorldKind::Nether);
+    
+    println!("Overworld (raytracing): {} bloques texturizados", overworld_rt.objects.len());
+    println!("Nether (raytracing): {} bloques texturizados", nether_rt.objects.len());
+    
+    let mut current_world = WorldType::Overworld;
+    
+    // Cámara orbital
+    let mut orbit = OrbitCamera::new(
+        0.6,  // yaw
+        0.25, // pitch
+        25.0, // radius
+        Vec3::new(0.0, 2.0, 0.0), // target
     );
     
-    // === Suelo (base de grass y dirt) ===
-    for x in -5..=5 {
-        for z in -5..=5 {
-            let px = x as f32 * 2.0;
-            let pz = z as f32 * 2.0;
-            scene.add_cube(
-                Vector3::new(px, -1.0, pz),
-                2.0,
-                grass.clone(),
-                grass_side.clone(),
-                dirt.clone()
-            );
-        }
-    }
+    // Ciclo solar
+    let mut sun_angle: f32 = 0.6; // Ángulo del sol
+    let mut animate_sun = false; // ESPACIO para activar
     
-    // === Casa de piedra ===
-    // Paredes
-    for y in 0..3 {
-        let py = y as f32 * 2.0;
-        // Pared frontal
-        scene.add_cube(Vector3::new(-4.0, py, -4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(-2.0, py, -4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        // Puerta (vidrio)
-        if y > 0 {
-            scene.add_cube(Vector3::new(0.0, py, -4.0), 2.0, glass.clone(), glass.clone(), glass.clone());
-        }
-        scene.add_cube(Vector3::new(2.0, py, -4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(4.0, py, -4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
+    println!("\n=== CONTROLES ===");
+    println!("Flechas: Orbitar cámara");
+    println!("Q/E: Zoom in/out");
+    println!("M: Cambiar mundo (Overworld/Nether)");
+    println!("ESPACIO: Ciclo solar día/noche");
+    println!("ESC: Salir\n");
+    
+    while !rl.window_should_close() {
+        let dt = rl.get_frame_time();
+        let speed = 1.6;
         
-        // Pared trasera
-        scene.add_cube(Vector3::new(-4.0, py, 4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(-2.0, py, 4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(0.0, py, 4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(2.0, py, 4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(4.0, py, 4.0), 2.0, stone.clone(), stone.clone(), stone.clone());
+        // Actualizar ciclo solar
+        if animate_sun {
+            sun_angle += dt * 0.3;
+        }
         
-        // Pared izquierda
-        scene.add_cube(Vector3::new(-4.0, py, -2.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(-4.0, py, 0.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(-4.0, py, 2.0), 2.0, stone.clone(), stone.clone(), stone.clone());
+        // Control de cámara
+        if rl.is_key_down(KeyboardKey::KEY_LEFT) { orbit.yaw -= speed * dt; }
+        if rl.is_key_down(KeyboardKey::KEY_RIGHT) { orbit.yaw += speed * dt; }
+        if rl.is_key_down(KeyboardKey::KEY_UP) { orbit.pitch -= speed * dt; }
+        if rl.is_key_down(KeyboardKey::KEY_DOWN) { orbit.pitch += speed * dt; }
+        if rl.is_key_down(KeyboardKey::KEY_Q) { orbit.radius = (orbit.radius - 2.0 * dt).max(3.0); }
+        if rl.is_key_down(KeyboardKey::KEY_E) { orbit.radius = (orbit.radius + 2.0 * dt).min(50.0); }
         
-        // Pared derecha
-        scene.add_cube(Vector3::new(4.0, py, -2.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(4.0, py, 0.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-        scene.add_cube(Vector3::new(4.0, py, 2.0), 2.0, stone.clone(), stone.clone(), stone.clone());
-    }
-    
-    // Techo
-    for x in -2..=2 {
-        for z in -2..=2 {
-            let px = x as f32 * 2.0;
-            let pz = z as f32 * 2.0;
-            scene.add_cube(Vector3::new(px, 6.0, pz), 2.0, stone.clone(), stone.clone(), stone.clone());
+        orbit.pitch = orbit.pitch.clamp(-PI * 0.48, PI * 0.48);
+        
+        // Cambiar mundo (M)
+        if rl.is_key_pressed(KeyboardKey::KEY_M) {
+            current_world = current_world.toggle();
+            println!("Mundo: {}", match current_world {
+                WorldType::Overworld => "OVERWORLD",
+                WorldType::Nether => "NETHER",
+            });
         }
-    }
-    
-    // === Antorchas alrededor de la casa ===
-    scene.spheres.push(Sphere::new(Vector3::new(-6.0, 1.5, -6.0), 0.3, torch.clone()));
-    scene.spheres.push(Sphere::new(Vector3::new(6.0, 1.5, -6.0), 0.3, torch.clone()));
-    scene.spheres.push(Sphere::new(Vector3::new(-6.0, 1.5, 6.0), 0.3, torch.clone()));
-    scene.spheres.push(Sphere::new(Vector3::new(6.0, 1.5, 6.0), 0.3, torch.clone()));
-    
-    // === Piscina de agua ===
-    for x in 6..=8 {
-        for z in -2..=0 {
-            let px = x as f32 * 2.0;
-            let pz = z as f32 * 2.0;
-            // Borde de piedra
-            if x == 6 || x == 8 || z == -2 || z == 0 {
-                scene.add_cube(Vector3::new(px, 0.0, pz), 2.0, stone.clone(), stone.clone(), stone.clone());
-            } else {
-                // Agua dentro
-                scene.add_cube(Vector3::new(px, 0.0, pz), 2.0, water.clone(), water.clone(), water.clone());
-            }
+        
+        // Ciclo solar (ESPACIO)
+        if rl.is_key_pressed(KeyboardKey::KEY_SPACE) {
+            animate_sun = !animate_sun;
+            println!("Ciclo solar: {}", if animate_sun { "ACTIVO" } else { "PAUSADO" });
         }
+        
+        // Seleccionar escena actual (raytracing con texturas)
+        let scene_rt = match current_world {
+            WorldType::Overworld => &overworld_rt,
+            WorldType::Nether => &nether_rt,
+        };
+        
+        let camera = orbit.to_camera(60.0);
+        
+        // === RENDERIZADO RAYTRACING ===
+        
+        // Raytracing optimizado en CPU con texturas PNG y ciclo solar
+        render(
+            &mut frame,
+            fb_width as i32,
+            fb_height as i32,
+            &camera,
+            sun_angle, // Pasar el ángulo del sol para iluminación dinámica
+            scene_rt,
+            1, // max depth REDUCIDO de 2 a 1 para MUCHO mejor FPS (menos reflejos recursivos)
+        );
+        let _ = tex.update_texture(&frame);
+
+        
+        let mut d = rl.begin_drawing(&thread);
+        d.clear_background(Color::BLACK);
+        
+        // Escalar textura a pantalla completa con filtrado
+        let src = Rectangle::new(0.0, 0.0, fb_width as f32, fb_height as f32);
+        let dst = Rectangle::new(0.0, 0.0, d.get_screen_width() as f32, d.get_screen_height() as f32);
+        d.draw_texture_pro(&tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+        
+        d.draw_text(&format!("FPS: {} | RAYTRACING | {} | Sol: {}", 
+            d.get_fps(),
+            match current_world {
+                WorldType::Overworld => "OVERWORLD",
+                WorldType::Nether => "NETHER",
+            },
+            if animate_sun { "Animado" } else { "Pausado" }
+        ), 10, 10, 24, Color::LIME);
+        d.draw_text("M: Cambiar mundo | SPACE: Ciclo solar", 10, 40, 18, Color::YELLOW);
     }
-    
-    // === Portal (efecto especial) ===
-    // Marco de obsidiana (simulado con piedra oscura)
-    let obsidian = Material::with_texture(
-        MaterialType::Stone,
-        ImageTexture::from_file_or_fallback("assets/obsidian.png", Color::new(20, 10, 30, 255))
-    );
-    
-    // Marco vertical
-    for y in 0..4 {
-        let py = y as f32 * 2.0;
-        scene.add_cube(Vector3::new(-8.0, py, 8.0), 2.0, obsidian.clone(), obsidian.clone(), obsidian.clone());
-        scene.add_cube(Vector3::new(-4.0, py, 8.0), 2.0, obsidian.clone(), obsidian.clone(), obsidian.clone());
-    }
-    // Marco horizontal
-    scene.add_cube(Vector3::new(-6.0, 8.0, 8.0), 2.0, obsidian.clone(), obsidian.clone(), obsidian.clone());
-    scene.add_cube(Vector3::new(-6.0, -2.0, 8.0), 2.0, obsidian.clone(), obsidian.clone(), obsidian.clone());
-    
-    // Interior del portal (efecto portal)
-    for y in 1..4 {
-        let py = y as f32 * 2.0;
-        scene.add_cube(Vector3::new(-6.0, py, 8.0), 2.0, portal_mat.clone(), portal_mat.clone(), portal_mat.clone());
-    }
-    
-    // === Playa de arena ===
-    for x in -8..=-6 {
-        for z in -2..=0 {
-            let px = x as f32 * 2.0;
-            let pz = z as f32 * 2.0;
-            scene.add_cube(Vector3::new(px, 0.0, pz), 2.0, sand.clone(), sand.clone(), sand.clone());
-        }
-    }
-    
-    // === Torre de vidrio ===
-    for y in 0..5 {
-        let py = y as f32 * 2.0;
-        scene.add_cube(Vector3::new(8.0, py, 8.0), 2.0, glass.clone(), glass.clone(), glass.clone());
-    }
-    
-    // === Árbol decorativo (simulado con cubos) ===
-    // Tronco
-    let wood = Material::with_texture(
-        MaterialType::Dirt,
-        ImageTexture::from_file_or_fallback("assets/wood.png", Color::new(139, 90, 43, 255))
-    );
-    scene.add_cube(Vector3::new(-10.0, 0.0, 0.0), 2.0, wood.clone(), wood.clone(), wood.clone());
-    scene.add_cube(Vector3::new(-10.0, 2.0, 0.0), 2.0, wood.clone(), wood.clone(), wood.clone());
-    scene.add_cube(Vector3::new(-10.0, 4.0, 0.0), 2.0, wood.clone(), wood.clone(), wood.clone());
-    
-    // Hojas
-    let leaves = Material::with_texture(
-        MaterialType::Grass,
-        ImageTexture::from_file_or_fallback("assets/leaves.png", Color::new(50, 150, 50, 255))
-    );
-    for x in -1..=1 {
-        for z in -1..=1 {
-            if x == 0 && z == 0 { continue; }
-            scene.add_cube(
-                Vector3::new(-10.0 + x as f32 * 2.0, 6.0, z as f32 * 2.0),
-                2.0,
-                leaves.clone(),
-                leaves.clone(),
-                leaves.clone()
-            );
-        }
-    }
-    scene.add_cube(Vector3::new(-10.0, 8.0, 0.0), 2.0, leaves.clone(), leaves.clone(), leaves.clone());
-    
-    // === Sol (esfera emisiva en el cielo) ===
-    let sun_angle = time * 0.3;
-    let sun_height = sun_angle.sin() * 20.0 + 15.0;
-    let sun_forward = sun_angle.cos() * 30.0;
-    let sun_mat = Material::new(MaterialType::Torch);
-    scene.spheres.push(Sphere::new(
-        Vector3::new(sun_forward, sun_height, -20.0),
-        3.0,
-        sun_mat
-    ));
-    
-    scene
 }

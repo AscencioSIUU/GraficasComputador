@@ -58,12 +58,3 @@ assets/
 ├── wood.png
 └── leaves.png
 ```
-
-## Copyright
-
-Si usas texturas de Minecraft, asegúrate de:
-1. No redistribuir las texturas sin permiso
-2. Dar crédito apropiado a Mojang Studios
-3. Usar solo para propósitos educativos/personales
-
-Para uso comercial, crea texturas originales o usa packs con licencia abierta.
