@@ -4,6 +4,7 @@ mod shader;
 
 use obj::Obj;
 use raylib::math::{Vector2, Vector3};
+use shader::Vector3Ext;
 use shader::{Fragment, Uniforms, star_shader, vertex_displacement};
 
 fn rotate_y(v: Vector3, angle: f32) -> Vector3 {
@@ -98,12 +99,17 @@ fn main() {
         return;
     }
 
-    // Variables de cámara
+    // Camera variables
     let mut cam_distance: f32 = 3.0;
     let mut cam_yaw: f32 = 0.0;
     let mut cam_pitch: f32 = 0.3;
     let rot_speed: f32 = 0.02;
     let zoom_speed: f32 = 0.1;
+
+    // (NEW) keep a simple camera looking +Z from -Z
+    fn camera_position(dist: f32) -> Vector3 {
+        Vector3::new(0.0, 0.0, -dist)
+    }
     
     // Rotación automática de la estrella
     let mut star_rotation: f32 = 0.0;
@@ -208,10 +214,7 @@ fn main() {
             star_rotation += 0.003;
         }
         
-        // Posición de cámara
-        let cam_x = cam_distance * cam_yaw.cos() * cam_pitch.cos();
-        let cam_y = cam_distance * cam_pitch.sin();
-        let cam_z = cam_distance * cam_yaw.sin() * cam_pitch.cos();
+        let cam_pos = camera_position(cam_distance);
 
         let fps = rl.get_fps();
 
@@ -241,87 +244,109 @@ fn main() {
         for i in (0..vertex_array.len()).step_by(3) {
             if i + 2 >= vertex_array.len() { break; }
             
-            let mut v0 = vertex_array[i];
-            let mut v1 = vertex_array[i + 1];
-            let mut v2 = vertex_array[i + 2];
-            let n0 = normals[i];
-            
-            // Aplicar vertex displacement (corona solar)
-            if enable_vertex_displacement {
-                v0 = vertex_displacement(v0, time);
-                v1 = vertex_displacement(v1, time);
-                v2 = vertex_displacement(v2, time);
-            }
-            
-            // Rotar estrella
-            v0 = rotate_y(v0, star_rotation);
-            v1 = rotate_y(v1, star_rotation);
-            v2 = rotate_y(v2, star_rotation);
-            let n0_rotated = rotate_y(n0, star_rotation);
+            // === PER TRIANGLE ===
+        let mut v0 = vertex_array[i];
+        let mut v1 = vertex_array[i + 1];
+        let mut v2 = vertex_array[i + 2];
+        let mut n0 = normals[i];     // per-face normal replicated 3x
+        let mut n1 = normals[i + 1];
+        let mut n2 = normals[i + 2];
 
-            // Transformar a espacio de cámara
-            let mut c0 = Vector3::new(v0.x - cam_x, v0.y - cam_y, v0.z - cam_z);
-            let mut c1 = Vector3::new(v1.x - cam_x, v1.y - cam_y, v1.z - cam_z);
-            let mut c2 = Vector3::new(v2.x - cam_x, v2.y - cam_y, v2.z - cam_z);
+        // 1) Optional surface displacement
+        if enable_vertex_displacement {
+            v0 = vertex_displacement(v0, time);
+            v1 = vertex_displacement(v1, time);
+            v2 = vertex_displacement(v2, time);
+        }
 
-            c0 = rotate_x(c0, -cam_pitch);
-            c0 = rotate_y(c0, -cam_yaw);
-            c1 = rotate_x(c1, -cam_pitch);
-            c1 = rotate_y(c1, -cam_yaw);
-            c2 = rotate_x(c2, -cam_pitch);
-            c2 = rotate_y(c2, -cam_yaw);
+        // 2) Star/object rotation
+        v0 = rotate_y(v0, star_rotation);
+        v1 = rotate_y(v1, star_rotation);
+        v2 = rotate_y(v2, star_rotation);
+        n0 = rotate_y(n0, star_rotation);
+        n1 = rotate_y(n1, star_rotation);
+        n2 = rotate_y(n2, star_rotation);
 
-            // Backface culling
-            let edge1 = Vector3::new(c1.x - c0.x, c1.y - c0.y, c1.z - c0.z);
-            let edge2 = Vector3::new(c2.x - c0.x, c2.y - c0.y, c2.z - c0.z);
-            let normal = Vector3::new(
-                edge1.y * edge2.z - edge1.z * edge2.y,
-                edge1.z * edge2.x - edge1.x * edge2.z,
-                edge1.x * edge2.y - edge1.y * edge2.x,
-            );
-            
-            let center = Vector3::new(
-                (c0.x + c1.x + c2.x) / 3.0,
-                (c0.y + c1.y + c2.y) / 3.0,
-                (c0.z + c1.z + c2.z) / 3.0,
-            );
-            let view_dir = Vector3::new(-center.x, -center.y, -center.z);
-            let dot = normal.x * view_dir.x + normal.y * view_dir.y + normal.z * view_dir.z;
-            
-            if dot <= 0.0 { continue; }
+        // 3) "Orbit" by rotating the MODEL with camera yaw/pitch
+        //    (camera stays fixed at (0,0,-dist) looking +Z)
+        v0 = rotate_x(v0, cam_pitch);
+        v1 = rotate_x(v1, cam_pitch);
+        v2 = rotate_x(v2, cam_pitch);
+        n0 = rotate_x(n0, cam_pitch);
+        n1 = rotate_x(n1, cam_pitch);
+        n2 = rotate_x(n2, cam_pitch);
 
-            // Proyección
-            let p0 = perspective_project(c0, width as f32, height as f32, fov);
-            let p1 = perspective_project(c1, width as f32, height as f32, fov);
-            let p2 = perspective_project(c2, width as f32, height as f32, fov);
+        v0 = rotate_y(v0, cam_yaw);
+        v1 = rotate_y(v1, cam_yaw);
+        v2 = rotate_y(v2, cam_yaw);
+        n0 = rotate_y(n0, cam_yaw);
+        n1 = rotate_y(n1, cam_yaw);
+        n2 = rotate_y(n2, cam_yaw);
 
-            if p0.is_none() || p1.is_none() || p2.is_none() { continue; }
-            let p0 = p0.unwrap();
-            let p1 = p1.unwrap();
-            let p2 = p2.unwrap();
+        // 4) View transform: translate only (camera is fixed)
+        let mut c0 = Vector3::new(v0.x - cam_pos.x, v0.y - cam_pos.y, v0.z - cam_pos.z);
+        let mut c1 = Vector3::new(v1.x - cam_pos.x, v1.y - cam_pos.y, v1.z - cam_pos.z);
+        let mut c2 = Vector3::new(v2.x - cam_pos.x, v2.y - cam_pos.y, v2.z - cam_pos.z);
 
-            // Aplicar shader
-            let world_center = Vector3::new(
-                (vertex_array[i].x + vertex_array[i + 1].x + vertex_array[i + 2].x) / 3.0,
-                (vertex_array[i].y + vertex_array[i + 1].y + vertex_array[i + 2].y) / 3.0,
-                (vertex_array[i].z + vertex_array[i + 1].z + vertex_array[i + 2].z) / 3.0,
-            );
-            
-            let fragment = Fragment {
-                world_position: world_center,
-                normal: n0_rotated,
-            };
-            
-            let color = star_shader(&fragment, &uniforms);
-            
-            let fill_color = Color::new(
-                (color.x * 255.0).clamp(0.0, 255.0) as u8,
-                (color.y * 255.0).clamp(0.0, 255.0) as u8,
-                (color.z * 255.0).clamp(0.0, 255.0) as u8,
-                255,
-            );
+        // 5) Backface culling — flip condition to keep front faces for your winding
+        let edge1 = Vector3::new(c1.x - c0.x, c1.y - c0.y, c1.z - c0.z);
+        let edge2 = Vector3::new(c2.x - c0.x, c2.y - c0.y, c2.z - c0.z);
+        let normal = Vector3::new(
+            edge1.y * edge2.z - edge1.z * edge2.y,
+            edge1.z * edge2.x - edge1.x * edge2.z,
+            edge1.x * edge2.y - edge1.y * edge2.x,
+        );
+        let center = Vector3::new(
+            (c0.x + c1.x + c2.x) / 3.0,
+            (c0.y + c1.y + c2.y) / 3.0,
+            (c0.z + c1.z + c2.z) / 3.0,
+        );
 
-            d.draw_triangle(p0, p1, p2, fill_color);
+        // camera is at origin after view transform, so view_dir points from triangle to camera
+        let view_dir = Vector3::new(-center.x, -center.y, -center.z);
+        let dot = normal.x * view_dir.x + normal.y * view_dir.y + normal.z * view_dir.z;
+
+        // FLIP: discard only when facing away under this winding
+        if dot >= 0.0 { continue; }
+
+        // 6) Project (now z should be positive)
+        let p0 = perspective_project(c0, width as f32, height as f32, fov);
+        let p1 = perspective_project(c1, width as f32, height as f32, fov);
+        let p2 = perspective_project(c2, width as f32, height as f32, fov);
+        if p0.is_none() || p1.is_none() || p2.is_none() { continue; }
+        let p0 = p0.unwrap();
+        let p1 = p1.unwrap();
+        let p2 = p2.unwrap();
+
+        // Fragment shading: use model-space center but with same rotations applied
+        let world_center = Vector3::new(
+            (v0.x + v1.x + v2.x) / 3.0,
+            (v0.y + v1.y + v2.y) / 3.0,
+            (v0.z + v1.z + v2.z) / 3.0,
+        );
+
+        // Pick any rotated normal; averaging is optional
+        let n_rot = Vector3::new(
+            (n0.x + n1.x + n2.x) / 3.0,
+            (n0.y + n1.y + n2.y) / 3.0,
+            (n0.z + n1.z + n2.z) / 3.0,
+        );
+
+        let fragment = Fragment {
+            world_position: world_center,
+            normal: n_rot.normalized(),
+        };
+
+        let color = star_shader(&fragment, &uniforms);
+        let fill_color = Color::new(
+            (color.x * 255.0).clamp(0.0, 255.0) as u8,
+            (color.y * 255.0).clamp(0.0, 255.0) as u8,
+            (color.z * 255.0).clamp(0.0, 255.0) as u8,
+            255,
+        );
+
+        d.draw_triangle(p0, p1, p2, fill_color);
+
         }
     }
     

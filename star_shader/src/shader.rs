@@ -50,12 +50,14 @@ pub fn star_shader(fragment: &Fragment, uniforms: &Uniforms) -> Vector3 {
     // ========== 1. TURBULENCIA SOLAR BASE ==========
     // Usamos múltiples capas de ruido para crear turbulencia compleja
     let turbulence_scale = 3.0;
-    let turbulence = fbm_noise_3d(
+    let turbulence_raw = fbm_noise_3d(
         pos.x as f64 * turbulence_scale + time * 0.1,
         pos.y as f64 * turbulence_scale + time * 0.15,
         pos.z as f64 * turbulence_scale + time * 0.12,
         6 // 6 octavas para detalle fino
     );
+    // Normalizar de [-1, 1] a [0, 1]
+    let turbulence = (turbulence_raw + 1.0) * 0.5;
     
     // ========== 2. MANCHAS SOLARES (SUNSPOTS) ==========
     // Zonas más oscuras que se mueven lentamente
@@ -64,47 +66,50 @@ pub fn star_shader(fragment: &Fragment, uniforms: &Uniforms) -> Vector3 {
         pos.y as f64 * 2.0,
         pos.z as f64 * 2.0 + time * 0.05
     );
-    let sunspots = if spot_noise < -0.3 { 
-        (spot_noise + 0.3).abs() * 2.0 
+    let sunspots = if spot_noise < -0.2 { 
+        ((spot_noise + 0.2).abs() * 1.5).min(0.3)
     } else { 
         0.0 
     };
     
     // ========== 3. PROMINENCIAS Y ERUPCIONES SOLARES ==========
     // Burbujas de actividad intensa que se expanden y contraen
-    let flare_noise = turbulence_noise_3d(
+    let flare_noise_raw = turbulence_noise_3d(
         pos.x as f64 * 5.0 + (time * 2.0).sin() * 0.5,
         pos.y as f64 * 5.0 + time * 0.3,
         pos.z as f64 * 5.0 + (time * 2.0).cos() * 0.5
     );
+    // Turbulence devuelve valores positivos, normalizar
+    let flare_noise = (flare_noise_raw.abs() * 0.5).min(1.0);
     
     // Pulsaciones periódicas (ciclo solar)
     let pulse = ((time * 1.5).sin() * 0.5 + 0.5) as f32;
-    let flares = if flare_noise > 0.4 { 
-        (flare_noise - 0.4) * 3.0 * pulse
+    let flares = if flare_noise > 0.6 { 
+        (flare_noise - 0.6) * 2.0 * pulse
     } else { 
         0.0 
     };
     
     // ========== 4. ACTIVIDAD SUPERFICIAL ANIMADA ==========
     // Células de convección (granulación)
-    let granulation = fbm_noise_3d(
+    let granulation_raw = fbm_noise_3d(
         pos.x as f64 * 15.0 + time * 0.5,
         pos.y as f64 * 15.0 + time * 0.6,
         pos.z as f64 * 15.0 + time * 0.55,
         4
-    ) * 0.15;
+    );
+    let granulation = ((granulation_raw + 1.0) * 0.5) * 0.15;
     
     // ========== 5. CALCULAR INTENSIDAD COMBINADA ==========
-    let mut intensity = 0.7; // Base
-    intensity += turbulence * 0.3; // Turbulencia general
-    intensity -= sunspots * 0.4; // Manchas oscuras
-    intensity += flares * 0.6; // Erupciones brillantes
+    let mut intensity = 0.8; // Base más alta
+    intensity += turbulence * 0.25; // Turbulencia general
+    intensity -= sunspots * 0.35; // Manchas oscuras
+    intensity += flares * 0.4; // Erupciones brillantes
     intensity += granulation; // Granulación fina
     
     // Aplicar intensidad global del uniform
     intensity *= uniforms.intensity;
-    intensity = intensity.clamp(0.0, 1.5);
+    intensity = intensity.clamp(0.3, 1.8); // Nunca completamente negro
     
     // ========== 6. GRADIENTE DE TEMPERATURA A COLOR ==========
     // Mapear intensidad a color realista de estrella
@@ -114,18 +119,18 @@ pub fn star_shader(fragment: &Fragment, uniforms: &Uniforms) -> Vector3 {
     
     // ========== 7. EMISIÓN DE LUZ VARIABLE ==========
     // Las zonas más intensas emiten más luz
-    let emission = intensity * 0.8;
+    let emission = intensity * 1.2; // Aumentado para más brillo
     
     // ========== 8. ILUMINACIÓN SUAVE (opcional) ==========
     // Las estrellas son auto-luminosas, pero añadimos forma sutil
     let light_dir = Vector3::new(0.5, 1.0, 0.3).normalized();
-    let light_factor = (normal.dot(light_dir) * 0.15 + 0.85).max(0.3);
+    let light_factor = (normal.dot(light_dir) * 0.2 + 0.8).max(0.5);
     
     // ========== 9. COLOR FINAL ==========
     Vector3::new(
-        (color.x * light_factor + emission * 0.3).clamp(0.0, 1.0),
-        (color.y * light_factor + emission * 0.2).clamp(0.0, 1.0),
-        (color.z * light_factor + emission * 0.1).clamp(0.0, 1.0),
+        (color.x * light_factor + emission * 0.5).clamp(0.0, 1.0),
+        (color.y * light_factor + emission * 0.4).clamp(0.0, 1.0),
+        (color.z * light_factor + emission * 0.3).clamp(0.0, 1.0),
     )
 }
 
@@ -136,27 +141,27 @@ fn temperature_to_color(intensity: f32, temp_factor: f32) -> Vector3 {
     
     if temp_factor < 0.3 {
         // Estrella roja/naranja (tipo M, K)
-        let t = (intensity * 1.5).clamp(0.0, 1.0);
+        let t = (intensity * 1.2).clamp(0.0, 1.0);
         Vector3::new(
-            0.9 + t * 0.1,           // Rojo alto
-            0.2 + t * 0.5,           // Verde bajo-medio
-            0.05 + t * 0.15,         // Azul muy bajo
+            1.0,                     // Rojo máximo
+            0.3 + t * 0.5,           // Verde bajo-medio
+            0.1 + t * 0.2,           // Azul muy bajo
         )
     } else if temp_factor < 0.6 {
         // Estrella amarilla (tipo G, F - como nuestro Sol)
-        let t = (intensity * 1.2).clamp(0.0, 1.0);
+        let t = (intensity * 1.0).clamp(0.0, 1.0);
         Vector3::new(
-            0.95 + t * 0.05,         // Rojo alto
-            0.8 + t * 0.2,           // Verde alto
-            0.3 + t * 0.4,           // Azul medio
+            1.0,                     // Rojo máximo
+            0.9 + t * 0.1,           // Verde alto
+            0.4 + t * 0.4,           // Azul medio
         )
     } else {
         // Estrella blanca/azul (tipo A, B, O)
         let t = intensity.clamp(0.0, 1.0);
         Vector3::new(
-            0.7 + t * 0.3,           // Rojo medio-alto
-            0.85 + t * 0.15,         // Verde alto
-            0.95 + t * 0.05,         // Azul muy alto
+            0.8 + t * 0.2,           // Rojo medio-alto
+            0.9 + t * 0.1,           // Verde alto
+            1.0,                     // Azul máximo
         )
     }
 }
@@ -203,7 +208,7 @@ pub fn vertex_displacement(position: Vector3, time: f32) -> Vector3 {
 
 // ========== UTILIDADES ==========
 
-trait Vector3Ext {
+pub trait Vector3Ext {
     fn normalized(self) -> Self;
     fn dot(self, other: Self) -> f32;
 }
