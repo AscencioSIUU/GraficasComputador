@@ -101,8 +101,8 @@ fn main() {
 
     // Camera variables
     let mut cam_distance: f32 = 3.0;
-    let mut cam_yaw: f32 = 0.0;
-    let mut cam_pitch: f32 = 0.3;
+    let mut cam_yaw: f32 = 1.57; // ~90 grados (vista lateral horizontal)
+    let mut cam_pitch: f32 = 0.0; // Completamente horizontal
     let rot_speed: f32 = 0.02;
     let zoom_speed: f32 = 0.1;
 
@@ -126,6 +126,8 @@ fn main() {
     println!("\n╔═══════════════════════════════════════════════════════════╗");
     println!("║           🌟 STAR SHADER LAB - CONTROLES 🌟             ║");
     println!("╠═══════════════════════════════════════════════════════════╣");
+    println!("║ VISTA: Plano horizontal - Se ve el movimiento lateral    ║");
+    println!("║                                                           ║");
     println!("║ CÁMARA:                                                   ║");
     println!("║   ← →        : Rotar horizontal                           ║");
     println!("║   ↑ ↓        : Rotar vertical                             ║");
@@ -145,6 +147,7 @@ fn main() {
     println!("║                                                           ║");
     println!("║   ESC        : Salir                                      ║");
     println!("╚═══════════════════════════════════════════════════════════╝\n");
+    println!("📍 Vista inicial: Plano horizontal para ver mejor el movimiento");
 
     while !rl.window_should_close() {
         time += rl.get_frame_time();

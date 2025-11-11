@@ -48,68 +48,68 @@ pub fn star_shader(fragment: &Fragment, uniforms: &Uniforms) -> Vector3 {
     let time = uniforms.time as f64;
     
     // ========== 1. TURBULENCIA SOLAR BASE ==========
-    // Usamos múltiples capas de ruido para crear turbulencia compleja
-    let turbulence_scale = 3.0;
+    // Usamos múltiples capas de ruido para crear turbulencia compleja EXAGERADA
+    let turbulence_scale = 8.0; // Aumentado de 3.0 para más detalle
     let turbulence_raw = fbm_noise_3d(
-        pos.x as f64 * turbulence_scale + time * 0.1,
-        pos.y as f64 * turbulence_scale + time * 0.15,
-        pos.z as f64 * turbulence_scale + time * 0.12,
-        6 // 6 octavas para detalle fino
+        pos.x as f64 * turbulence_scale + time * 0.4,  // Velocidad 4x más rápida
+        pos.y as f64 * turbulence_scale + time * 0.5,
+        pos.z as f64 * turbulence_scale + time * 0.45,
+        8 // Más octavas para ruido más caótico
     );
-    // Normalizar de [-1, 1] a [0, 1]
-    let turbulence = (turbulence_raw + 1.0) * 0.5;
+    // Normalizar y exagerar el contraste
+    let turbulence = ((turbulence_raw + 1.0) * 0.5).powf(0.6); // Exponente para más contraste
     
     // ========== 2. MANCHAS SOLARES (SUNSPOTS) ==========
-    // Zonas más oscuras que se mueven lentamente
+    // Zonas MUY oscuras y grandes que se mueven rápido
     let spot_noise = perlin_noise_3d(
-        pos.x as f64 * 2.0 + time * 0.05,
-        pos.y as f64 * 2.0,
-        pos.z as f64 * 2.0 + time * 0.05
+        pos.x as f64 * 4.0 + time * 0.2,  // Frecuencia y velocidad aumentadas
+        pos.y as f64 * 4.0,
+        pos.z as f64 * 4.0 + time * 0.2
     );
-    let sunspots = if spot_noise < -0.2 { 
-        ((spot_noise + 0.2).abs() * 1.5).min(0.3)
+    let sunspots = if spot_noise < 0.0 {  // Threshold más agresivo
+        (spot_noise.abs() * 3.0).min(0.8)  // Mucho más oscuro
     } else { 
         0.0 
     };
     
     // ========== 3. PROMINENCIAS Y ERUPCIONES SOLARES ==========
-    // Burbujas de actividad intensa que se expanden y contraen
+    // Burbujas VIOLENTAS de actividad intensa
     let flare_noise_raw = turbulence_noise_3d(
-        pos.x as f64 * 5.0 + (time * 2.0).sin() * 0.5,
-        pos.y as f64 * 5.0 + time * 0.3,
-        pos.z as f64 * 5.0 + (time * 2.0).cos() * 0.5
+        pos.x as f64 * 12.0 + (time * 4.0).sin() * 2.0,  // Mucho más rápido y agresivo
+        pos.y as f64 * 12.0 + time * 1.2,
+        pos.z as f64 * 12.0 + (time * 4.0).cos() * 2.0
     );
-    // Turbulence devuelve valores positivos, normalizar
-    let flare_noise = (flare_noise_raw.abs() * 0.5).min(1.0);
+    // Turbulence muy exagerado
+    let flare_noise = (flare_noise_raw.abs() * 1.5).min(2.0);
     
-    // Pulsaciones periódicas (ciclo solar)
-    let pulse = ((time * 1.5).sin() * 0.5 + 0.5) as f32;
-    let flares = if flare_noise > 0.6 { 
-        (flare_noise - 0.6) * 2.0 * pulse
+    // Pulsaciones INTENSAS (ciclo solar acelerado)
+    let pulse = ((time * 3.0).sin() * 0.5 + 0.5) as f32;  // 2x más rápido
+    let flares = if flare_noise > 0.3 {  // Threshold más bajo para más erupciones
+        (flare_noise - 0.3) * 4.0 * pulse  // Mucho más intenso
     } else { 
         0.0 
     };
     
     // ========== 4. ACTIVIDAD SUPERFICIAL ANIMADA ==========
-    // Células de convección (granulación)
+    // Células de convección VIOLENTAS (granulación extrema)
     let granulation_raw = fbm_noise_3d(
-        pos.x as f64 * 15.0 + time * 0.5,
-        pos.y as f64 * 15.0 + time * 0.6,
-        pos.z as f64 * 15.0 + time * 0.55,
-        4
+        pos.x as f64 * 30.0 + time * 1.5,  // Mucho más fino y rápido
+        pos.y as f64 * 30.0 + time * 1.8,
+        pos.z as f64 * 30.0 + time * 1.65,
+        6  // Más octavas
     );
-    let granulation = ((granulation_raw + 1.0) * 0.5) * 0.15;
+    let granulation = ((granulation_raw + 1.0) * 0.5).powf(0.5) * 0.4;  // Mucho más visible
     
     // ========== 5. CALCULAR INTENSIDAD COMBINADA ==========
-    let mut intensity = 0.8; // Base más alta
-    intensity += turbulence * 0.25; // Turbulencia general
-    intensity -= sunspots * 0.35; // Manchas oscuras
-    intensity += flares * 0.4; // Erupciones brillantes
-    intensity += granulation; // Granulación fina
+    let mut intensity = 0.7; // Base
+    intensity += turbulence * 0.6; // MUCHO más turbulencia
+    intensity -= sunspots * 0.7; // Manchas MUY oscuras
+    intensity += flares * 1.2; // Erupciones EXTREMAS
+    intensity += granulation * 0.8; // Granulación muy visible
     
     // Aplicar intensidad global del uniform
     intensity *= uniforms.intensity;
-    intensity = intensity.clamp(0.3, 1.8); // Nunca completamente negro
+    intensity = intensity.clamp(0.1, 2.5); // Rango más amplio para contraste extremo
     
     // ========== 6. GRADIENTE DE TEMPERATURA A COLOR ==========
     // Mapear intensidad a color realista de estrella
@@ -118,19 +118,19 @@ pub fn star_shader(fragment: &Fragment, uniforms: &Uniforms) -> Vector3 {
     let color = temperature_to_color(intensity, temp_factor);
     
     // ========== 7. EMISIÓN DE LUZ VARIABLE ==========
-    // Las zonas más intensas emiten más luz
-    let emission = intensity * 1.2; // Aumentado para más brillo
+    // Las zonas más intensas emiten MUCHA más luz (picos dramáticos)
+    let emission = (intensity * intensity * 2.0).min(3.0); // Cuadrático para picos extremos
     
     // ========== 8. ILUMINACIÓN SUAVE (opcional) ==========
     // Las estrellas son auto-luminosas, pero añadimos forma sutil
     let light_dir = Vector3::new(0.5, 1.0, 0.3).normalized();
-    let light_factor = (normal.dot(light_dir) * 0.2 + 0.8).max(0.5);
+    let light_factor = (normal.dot(light_dir) * 0.3 + 0.7).max(0.4);
     
     // ========== 9. COLOR FINAL ==========
     Vector3::new(
-        (color.x * light_factor + emission * 0.5).clamp(0.0, 1.0),
-        (color.y * light_factor + emission * 0.4).clamp(0.0, 1.0),
-        (color.z * light_factor + emission * 0.3).clamp(0.0, 1.0),
+        (color.x * light_factor + emission * 0.8).clamp(0.0, 1.0),  // Mucha más emisión
+        (color.y * light_factor + emission * 0.7).clamp(0.0, 1.0),
+        (color.z * light_factor + emission * 0.6).clamp(0.0, 1.0),
     )
 }
 
@@ -168,27 +168,27 @@ fn temperature_to_color(intensity: f32, temp_factor: f32) -> Vector3 {
 
 // ========== VERTEX SHADER (DISTORSIÓN) ==========
 
-/// Desplaza vértices para crear efecto de corona solar y flares
+/// Desplaza vértices para crear efecto de corona solar y flares EXTREMOS
 pub fn vertex_displacement(position: Vector3, time: f32) -> Vector3 {
     let t = time as f64;
     
-    // Corona solar (expansión radial)
+    // Corona solar VIOLENTA (expansión radial extrema)
     let corona_noise = perlin_noise_3d(
-        position.x as f64 * 4.0 + t * 0.2,
-        position.y as f64 * 4.0 + t * 0.25,
-        position.z as f64 * 4.0 + t * 0.22
+        position.x as f64 * 8.0 + t * 0.8,  // Más rápido y detallado
+        position.y as f64 * 8.0 + t * 1.0,
+        position.z as f64 * 8.0 + t * 0.9
     );
     
-    // Prominencias (extensiones direccionales)
+    // Prominencias GIGANTES (extensiones direccionales masivas)
     let prominence = fbm_noise_3d(
-        position.x as f64 * 6.0,
-        position.y as f64 * 6.0 + t * 0.5,
-        position.z as f64 * 6.0,
-        3
+        position.x as f64 * 10.0,
+        position.y as f64 * 10.0 + t * 1.5,  // Mucho más rápido
+        position.z as f64 * 10.0,
+        5  // Más octavas para más caos
     );
     
-    // Calcular desplazamiento radial
-    let displacement = (corona_noise * 0.08 + prominence.abs() * 0.12) as f32;
+    // Desplazamiento radial EXTREMO
+    let displacement = (corona_noise.abs() * 0.25 + prominence.abs() * 0.35) as f32;  // 3x más grande
     
     // Normalizar posición para obtener dirección radial
     let len = (position.x * position.x + position.y * position.y + position.z * position.z).sqrt();
@@ -198,7 +198,7 @@ pub fn vertex_displacement(position: Vector3, time: f32) -> Vector3 {
         Vector3::new(0.0, 1.0, 0.0)
     };
     
-    // Aplicar desplazamiento
+    // Aplicar desplazamiento MASIVO
     Vector3::new(
         position.x + direction.x * displacement,
         position.y + direction.y * displacement,
