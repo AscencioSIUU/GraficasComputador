@@ -42,45 +42,106 @@ fn voronoi_noise_3d(x: f64, y: f64, z: f64) -> f32 {
     worley.get([x, y, z]) as f32
 }
 
+// Función fbm helper (Fractional Brownian Motion)
+fn fbm(x: f32, y: f32, z: f32, octaves: usize) -> f32 {
+    fbm_noise_3d(x as f64, y as f64, z as f64, octaves)
+}
+
 pub fn star_shader(fragment: &Fragment, uniforms: &Uniforms) -> Vector3 {
-    // Sol con RUIDO FRACTAL mejorado (FBM intenso) - Temperatura controlada con corona
     let pos = fragment.world_position;
-    let time = uniforms.time as f64;
-
-    // Múltiples capas de ruido fractal para efecto dramático
-    let fractal1 = fbm_noise_3d(pos.x as f64 * 4.0 + time * 0.5,
-                                pos.y as f64 * 4.0 + time * 0.55,
-                                pos.z as f64 * 4.0 + time * 0.6,
-                                8);
     
-    let fractal2 = fbm_noise_3d(pos.x as f64 * 8.0 - time * 0.3,
-                                pos.y as f64 * 8.0,
-                                pos.z as f64 * 8.0 - time * 0.3,
-                                6);
+    // Base red-orange color palette (más rojo)
+    let core_color = Vector3::new(1.0, 0.15, 0.0);      // Rojo intenso nuclear
+    let mid_color = Vector3::new(1.0, 0.4, 0.05);       // Naranja rojizo
+    let outer_color = Vector3::new(1.0, 0.6, 0.2);      // Naranja más claro
+    let corona_color = Vector3::new(1.0, 0.05, 0.0);    // Rojo puro para corona
     
-    let turbulence = ((fractal1 + fractal2) * 0.5 + 1.0) * 0.5;
-    let fractal_intensity = turbulence.powf(0.4);
-
-    // Manchas solares
-    let sunspot_fractal = fbm_noise_3d(pos.x as f64 * 5.0 + time * 0.15,
-                                       pos.y as f64 * 5.0,
-                                       pos.z as f64 * 5.0 + time * 0.15,
-                                       4);
-    let sunspot = if sunspot_fractal < -0.1 { (sunspot_fractal.abs() * 1.8).min(0.5) } else { 0.0 };
-
-    let mut intensity = 0.8 + fractal_intensity * 1.0 - sunspot * 0.3;
-    intensity *= uniforms.intensity;
-    intensity = intensity.clamp(0.3, 3.5);
-
-    // COLORES CÁLIDOS pero no excesivos
-    let color = Vector3::new(1.0, 0.85, 0.3);
-
-    let emission = (intensity * intensity * 2.0).min(4.0);
-
+    // Múltiples capas de ruido para textura solar
+    let scale1 = 0.8;
+    let scale2 = 1.5;
+    let scale3 = 3.0;
+    let time = uniforms.time * 0.3;
+    
+    // Noise principal (manchas solares)
+    let noise1 = fbm(
+        pos.x * scale1 + time * 0.5,
+        pos.y * scale1 - time * 0.3,
+        pos.z * scale1,
+        5
+    );
+    
+    // Noise secundario (granulación)
+    let noise2 = fbm(
+        pos.x * scale2 - time * 0.7,
+        pos.y * scale2,
+        pos.z * scale2 + time * 0.4,
+        4
+    );
+    
+    // Noise de alta frecuencia (turbulencia)
+    let noise3 = fbm(
+        pos.x * scale3 + time * 1.2,
+        pos.y * scale3 - time * 0.9,
+        pos.z * scale3,
+        3
+    );
+    
+    // Distancia desde el centro (para efecto de corona)
+    let dist_from_center = (pos.x * pos.x + pos.y * pos.y + pos.z * pos.z).sqrt();
+    let normalized_dist = (dist_from_center - 11.0).max(0.0) / 2.0; // Ajustado al tamaño del sol (12.0)
+    
+    // Combinar ruidos
+    let combined_noise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
+    
+    // Interpolar entre colores según el ruido
+    let mut base_color = if combined_noise < 0.3 {
+        // Zonas oscuras (manchas solares) - rojo oscuro
+        let t = combined_noise / 0.3;
+        core_color.lerp(mid_color, t)
+    } else if combined_noise < 0.7 {
+        // Zonas medias
+        let t = (combined_noise - 0.3) / 0.4;
+        mid_color.lerp(outer_color, t)
+    } else {
+        // Zonas brillantes
+        outer_color
+    };
+    
+    // EFECTO DE CORONA RADIACTIVA (halo rojo en los bordes)
+    let corona_intensity = (normalized_dist * 2.0).min(1.0);
+    if corona_intensity > 0.0 {
+        // Ruido animado para la corona
+        let corona_noise = fbm(
+            pos.x * 2.0 + time * 2.0,
+            pos.y * 2.0,
+            pos.z * 2.0 - time * 1.5,
+            3
+        );
+        
+        // Intensidad pulsante de la corona
+        let pulse = (uniforms.time * 2.0).sin() * 0.3 + 0.7;
+        let corona_strength = corona_intensity * (corona_noise * 0.5 + 0.5) * pulse;
+        
+        // Mezclar con color de corona (rojo intenso)
+        base_color = base_color.lerp(corona_color, corona_strength * 0.6);
+        
+        // Aumentar brillo en la corona
+        base_color = base_color * (1.0 + corona_strength * 1.5);
+    }
+    
+    // Aumentar brillo general (emisivo)
+    let brightness = 1.3 + combined_noise * 0.4;
+    base_color = base_color * brightness;
+    
+    // Pulsación sutil
+    let pulse_factor = 1.0 + (uniforms.time * 1.5).sin() * 0.08;
+    base_color = base_color * pulse_factor;
+    
+    // Clamp para evitar valores extremos
     Vector3::new(
-        (color.x * 0.6 + emission * 1.0).clamp(0.0, 1.0),
-        (color.y * 0.6 + emission * 0.9).clamp(0.0, 1.0),
-        (color.z * 0.5 + emission * 0.7).clamp(0.0, 1.0),
+        base_color.x.min(2.0),
+        base_color.y.min(1.5),
+        base_color.z.min(1.0)
     )
 }
 
@@ -152,7 +213,7 @@ pub fn spaceship_shader(fragment: &Fragment, time: f32) -> Vector3 {
 }
 
 // Mercury: CELLULAR NOISE (Worley/Cellular) - Con corona
-pub fn cellular_planet_shader(fragment: &Fragment, t: f32, base_color: Vector3) -> Vector3 {
+pub fn cellular_planet_shader(fragment: &Fragment, _t: f32, base_color: Vector3) -> Vector3 {
     let pos = fragment.world_position;
     
     let cellular = cellular_noise_3d(pos.x as f64 * 6.0, pos.y as f64 * 6.0, pos.z as f64 * 6.0);
@@ -210,7 +271,7 @@ pub fn simplex_planet_shader(fragment: &Fragment, t: f32, base_color: Vector3) -
 }
 
 // Earth: VORONOI NOISE (Worley con seed diferente) - Con corona
-pub fn voronoi_planet_shader(fragment: &Fragment, t: f32, base_color: Vector3) -> Vector3 {
+pub fn voronoi_planet_shader(fragment: &Fragment, _t: f32, base_color: Vector3) -> Vector3 {
     let pos = fragment.world_position;
     
     let voronoi = voronoi_noise_3d(pos.x as f64 * 5.0, pos.y as f64 * 5.0, pos.z as f64 * 5.0);
@@ -242,7 +303,7 @@ pub fn voronoi_planet_shader(fragment: &Fragment, t: f32, base_color: Vector3) -
 }
 
 // Mars: PERLIN NOISE (clásico) - Con corona
-pub fn perlin_planet_shader(fragment: &Fragment, t: f32, base_color: Vector3) -> Vector3 {
+pub fn perlin_planet_shader(fragment: &Fragment, _t: f32, base_color: Vector3) -> Vector3 {
     let pos = fragment.world_position;
     
     let perlin1 = perlin_noise_3d(pos.x as f64 * 3.0, pos.y as f64 * 3.0, pos.z as f64 * 3.0);
