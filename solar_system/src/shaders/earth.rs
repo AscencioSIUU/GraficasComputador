@@ -21,14 +21,14 @@ pub fn vertex_displacement_earth(position: Vector3, time: f32) -> Vector3 {
         2  // Reducido de 3 a 2
     );
     
-    // CORONA: Worley noise para atmósfera celular (auroras, nubes ionosféricas)
+    // CORONA: Worley noise para atmósfera celular SUAVE
     let corona_worley = worley_noise_3d(
-        position.x as f64 * 8.0 + t * 0.3,
-        position.y as f64 * 8.0 + t * 0.4,
-        position.z as f64 * 8.0 + t * 0.2
+        position.x as f64 * 10.0 + t * 0.3,
+        position.y as f64 * 10.0 + t * 0.4,
+        position.z as f64 * 10.0 + t * 0.2
     ) as f32;
     
-    let displacement = (terrain_noise.abs() * 0.07 + mountains.abs() * 0.05 + corona_worley * 0.6) as f32;
+    let displacement = (terrain_noise.abs() * 0.05 + mountains.abs() * 0.04 + corona_worley * 0.35) as f32;
     
     let len = (position.x * position.x + position.y * position.y + position.z * position.z).sqrt();
     let direction = if len > 0.001 {

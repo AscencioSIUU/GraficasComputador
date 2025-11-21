@@ -6,23 +6,23 @@ use super::common::{Fragment, Uniforms, fbm, perlin_noise_3d, fbm_noise_3d};
 pub fn vertex_displacement(position: Vector3, time: f32) -> Vector3 {
     let t = time as f64;
     
-    // Corona solar - MUY PRONUNCIADA para que se vea claramente
+    // Corona solar - SUAVE y continua
     let corona_noise = perlin_noise_3d(
-        position.x as f64 * 4.0 + t * 0.6,
-        position.y as f64 * 4.0 + t * 0.8,
-        position.z as f64 * 4.0 + t * 0.7
+        position.x as f64 * 5.0 + t * 0.6,
+        position.y as f64 * 5.0 + t * 0.8,
+        position.z as f64 * 5.0 + t * 0.7
     );
     
-    // Prominencias solares - grandes llamaradas
+    // Prominencias solares - más suaves
     let prominence = fbm_noise_3d(
-        position.x as f64 * 6.0,
-        position.y as f64 * 6.0 + t * 1.2,
-        position.z as f64 * 6.0,
+        position.x as f64 * 7.0,
+        position.y as f64 * 7.0 + t * 1.2,
+        position.z as f64 * 7.0,
         3  // Reducido para performance
     );
     
-    // Desplazamiento MUCHO MÁS GRANDE para corona visible (aumentado 4-5x)
-    let displacement = (corona_noise.abs() * 1.0 + prominence.abs() * 1.2) as f32;
+    // Desplazamiento SUAVE para corona continua - AUMENTADO para corona más grande
+    let displacement = (corona_noise.abs() * 1.8 + prominence.abs() * 1.4) as f32;
     
     let len = (position.x * position.x + position.y * position.y + position.z * position.z).sqrt();
     let direction = if len > 0.001 {

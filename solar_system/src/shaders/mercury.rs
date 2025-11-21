@@ -14,15 +14,15 @@ pub fn vertex_displacement_mercury(position: Vector3, time: f32) -> Vector3 {
         position.z as f64 * 10.0
     );
     
-    // CORONA: Domain warping para exosfera distorsionada (Mercurio tiene atmósfera muy tenue)
+    // CORONA: Domain warping para exosfera SUAVE
     let corona_warp = domain_warp_3d(
-        position.x as f64 * 6.0,
-        position.y as f64 * 6.0,
-        position.z as f64 * 6.0,
+        position.x as f64 * 8.0,
+        position.y as f64 * 8.0,
+        position.z as f64 * 8.0,
         t * 0.6
     ) as f32;
     
-    let displacement = (crater_noise.abs() * 0.06 + corona_warp.abs() * 0.5) as f32;
+    let displacement = (crater_noise.abs() * 0.04 + corona_warp.abs() * 0.3) as f32;
     
     let len = (position.x * position.x + position.y * position.y + position.z * position.z).sqrt();
     let direction = if len > 0.001 {
@@ -48,18 +48,21 @@ pub fn cellular_planet_shader(fragment: &Fragment, _t: f32, base_color: Vector3)
     let diff = fragment.normal.dot(light_dir).max(0.0);
     
     let view_dir = Vector3::new(0.0, 0.0, -1.0).normalized();
-    let rim = (1.0 - fragment.normal.dot(view_dir).abs()).powf(2.5) * 0.4;
+    let rim = (1.0 - fragment.normal.dot(view_dir).abs()).powf(2.5) * 0.5; // Aumentado para corona más visible
     
-    let heat_boost = 0.25;
+    // Corona AZUL para Aeon
+    let rim_color = Vector3::new(0.2, 0.5, 1.0); // Color azul brillante
+    
+    let heat_boost = 0.1; // Reducido para mantener el azul oscuro
     let color_mod = Vector3::new(
+        cellular_pattern * 0.3,
+        cellular_pattern * 0.4,
         cellular_pattern * 0.5 + heat_boost,
-        cellular_pattern * 0.4 + heat_boost * 0.5,
-        cellular_pattern * 0.2,
     );
     
     Vector3::new(
-        ((base_color.x * 1.2 + color_mod.x) * (0.2 + diff * 0.8) + rim).clamp(0.0, 1.0),
-        ((base_color.y * 1.1 + color_mod.y) * (0.2 + diff * 0.8) + rim * 0.8).clamp(0.0, 1.0),
-        ((base_color.z * 0.8 + color_mod.z) * (0.2 + diff * 0.8) + rim * 0.6).clamp(0.0, 1.0),
+        ((base_color.x + color_mod.x) * (0.2 + diff * 0.8) + rim * rim_color.x).clamp(0.0, 1.0),
+        ((base_color.y + color_mod.y) * (0.2 + diff * 0.8) + rim * rim_color.y).clamp(0.0, 1.0),
+        ((base_color.z + color_mod.z) * (0.2 + diff * 0.8) + rim * rim_color.z).clamp(0.0, 1.0),
     )
 }

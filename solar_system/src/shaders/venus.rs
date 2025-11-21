@@ -21,15 +21,15 @@ pub fn vertex_displacement_venus(position: Vector3, time: f32) -> Vector3 {
         2  // Reducido de 4 a 2
     );
     
-    // CORONA: Ridged multifractal para capas de atmósfera densa (Venus tiene atmósfera muy gruesa)
+    // CORONA: Ridged multifractal para capas de atmósfera SUAVES
     let corona_ridged = ridged_multifractal(
-        position.x as f64 * 4.0 + t * 0.4,
-        position.y as f64 * 4.0 + t * 0.5,
-        position.z as f64 * 4.0 + t * 0.3,
+        position.x as f64 * 6.0 + t * 0.4,
+        position.y as f64 * 6.0 + t * 0.5,
+        position.z as f64 * 6.0 + t * 0.3,
         3  // octaves
     ) as f32;
     
-    let displacement = (cloud_noise.abs() * 0.08 + turbulence.abs() * 0.06 + corona_ridged * 0.65) as f32;
+    let displacement = (cloud_noise.abs() * 0.06 + turbulence.abs() * 0.05 + corona_ridged * 0.45) as f32;
     
     let len = (position.x * position.x + position.y * position.y + position.z * position.z).sqrt();
     let direction = if len > 0.001 {

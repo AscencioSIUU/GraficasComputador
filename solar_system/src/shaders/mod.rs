@@ -8,7 +8,9 @@ pub mod venus;
 pub mod earth;
 pub mod mars;
 pub mod goliath;
+pub mod saturn;
 pub mod spaceship;
+pub mod kleos;
 
 // Re-exportar tipos comunes
 pub use common::{Fragment, Uniforms, Vector3Ext};
@@ -20,4 +22,6 @@ pub use venus::{simplex_planet_shader, vertex_displacement_venus};
 pub use earth::{voronoi_planet_shader, vertex_displacement_earth};
 pub use mars::{perlin_planet_shader, vertex_displacement_mars};
 pub use goliath::{planet_shader, vertex_displacement_goliath};
+pub use saturn::{saturn_shader, vertex_displacement_saturn};
 pub use spaceship::spaceship_shader;
+pub use kleos::kleos_shader;

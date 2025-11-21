@@ -21,17 +21,17 @@ pub fn vertex_displacement_mars(position: Vector3, time: f32) -> Vector3 {
         2  // Reducido de 4 a 2
     );
     
-    // CORONA: FBM mejorado para tormentas de polvo marcianas
+    // CORONA: FBM mejorado para tormentas de polvo SUAVES
     let corona_fbm = fbm_enhanced(
-        position.x as f64 * 5.0 + t * 0.4,
-        position.y as f64 * 5.0 + t * 0.3,
-        position.z as f64 * 5.0 + t * 0.5,
+        position.x as f64 * 8.0 + t * 0.4,
+        position.y as f64 * 8.0 + t * 0.3,
+        position.z as f64 * 8.0 + t * 0.5,
         3,      // octaves
         2.0,    // lacunarity
         0.5     // gain
     ) as f32;
     
-    let displacement = (canyon_noise.abs() * 0.06 + dunes.abs() * 0.05 + corona_fbm.abs() * 0.7) as f32;
+    let displacement = (canyon_noise.abs() * 0.04 + dunes.abs() * 0.03 + corona_fbm.abs() * 0.4) as f32;
     
     let len = (position.x * position.x + position.y * position.y + position.z * position.z).sqrt();
     let direction = if len > 0.001 {
